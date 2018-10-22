@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+        <title>PlanetUranium</title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+		<script src="/socket.io/socket.io.js"></script>
+		<link href="styling.css" type="text/css" rel="stylesheet" />
+        <link href='https://fonts.googleapis.com/css?family=ABeeZee' rel='stylesheet'>     
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	</head>
+
+<body>
+
+    <h1 class="center">Login to PlanetUranium</h1>
+
+    <div id="loginForm">
+        <p>Username:</p>
+        <input type="text" id="usernameInput" placeholder="Username">
+
+        <p class="hide" id="passwordWarningText">Don't use the same password here that you use elsewhere,
+        alltought passwords are hashed, the hash function might not be safe.</p>
+
+        <p>Password:</p>
+        <input type="password" id="passwordInput" placeholder="Password">
+
+        <p class="hide" id="passwordConfirmText">Confirm password:</p>
+        <input class="hide" type="password" id="passwordConfirmInput" placeholder="Password Confirm"> <br>
+
+        <p id="failedText" style="color:orange"></p>
+
+        <button id="submitButton">Login</button>
+
+        <p id="switchFormText">Are you new player? Register here:</p>
+        <button id="switchFormButton">Register</button>
+    </div>
+
+    <script src="/connection.js"></script>
+    <script src="/login.js"></script>
+
+</body>
+</html>

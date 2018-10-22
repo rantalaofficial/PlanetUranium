@@ -1,0 +1,66 @@
+:root {
+    --margin: 10px;
+    --gray: #a5b5ce;
+    --darkgray: #718191;
+    --warning: orange;
+}
+
+
+.center {
+    text-align: center;
+}
+
+* {
+    font-family: 'ABeeZee';
+}
+
+body {
+    background-color: var(--gray);
+}
+
+input {
+    font-size: 16px;
+}
+
+p {
+    color: white;
+}
+
+/* LOGIN AND REGISTER */
+#loginForm {
+    min-width: 300px;
+    min-height: 200px;
+    text-align: center;
+    margin: 0px;
+    padding: 10px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 30%;
+    height: 40%;
+    transform: translate(-50%, -50%);
+    background-color: var(--darkgray);
+}
+
+#loginForm p {
+    margin: 0px;
+}
+
+#usernameInput, #passwordInput, #passwordConfirmInput {
+    margin: var(--margin);
+    width: 50%;
+}
+
+#submitButton, #switchFormButton {
+    margin: var(--margin);
+    width: 25%;
+    height: 10%;
+}
+
+.hide {
+    display: none;
+}
+
+#passwordWarningText {
+    color: var(--warning);
+}
