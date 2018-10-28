@@ -26,6 +26,20 @@ p {
     color: white;
 }
 
+#gameCanvas {
+    /*
+    width: 80%;
+    height: 80%;
+    */
+    width: 1000px;
+    height: 600px;
+}
+#bufferCanvas {
+    display: none;
+}
+
+
+
 /* LOGIN AND REGISTER */
 #loginForm {
     min-width: 300px;
@@ -57,10 +71,15 @@ p {
     height: 10%;
 }
 
-.hide {
-    display: none;
-}
-
 #passwordWarningText {
     color: var(--warning);
+}
+
+#loginInfoText {
+    text-align: left;
+    margin: 0px;
+}
+
+.hide {
+    display: none;
 }

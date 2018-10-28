@@ -1,6 +1,11 @@
+$(document).ready(function() {
+    resetTexts();
+});
+
 var showRegister = false;
 
 $('#submitButton').click(function() {
+    resetTexts();
     if(showRegister) {
         register($('#usernameInput').val(), $('#passwordInput').val(), $('#passwordConfirmInput').val());
     } else {
@@ -9,8 +14,7 @@ $('#submitButton').click(function() {
 });
 
 $('#switchFormButton').click(function() {
-    $('#failedText').text("");
-
+    resetTexts();
     $('#passwordConfirmText').toggle();
     $('#passwordConfirmInput').toggle();
     $('#passwordWarningText').toggle();
@@ -28,6 +32,11 @@ $('#switchFormButton').click(function() {
     } 
 });
 
+function resetTexts() {
+    $('#successfulText').text('');
+    $('#failedText').text('');
+}
+
 function login(username, password) {
     if(username && password) {
         socket.emit('LOGIN', {
@@ -40,7 +49,6 @@ function login(username, password) {
 }
 
 function register(username, password, confirmPassword) {
-    console.log(password, confirmPassword);
     if(username && password) {
         if(password === confirmPassword) {
             socket.emit('REGISTER', {
@@ -56,14 +64,15 @@ function register(username, password, confirmPassword) {
 }
 
 socket.on('LOGGED', function(data) {
-    alert("logged");
+    document.cookie = $('#usernameInput').val() + ' ' + $('#passwordInput').val();
+    location.href = 'game.html';
 });
 socket.on('LOGINFAILED', function(data) {
     $('#failedText').text(data);
 });
 
 socket.on('REGISTERED', function(data) {
-    alert("registered");
+    $('#successfulText').text("Register successful, now just login.");
 });
 socket.on('REGISTERFAILED', function(data) {
     $('#failedText').text(data);
