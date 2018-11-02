@@ -1,6 +1,6 @@
 :root {
     --margin: 10px;
-    --gray: #a5b5ce;
+    --gray: #666666;
     --darkgray: #718191;
     --warning: orange;
 }
@@ -26,19 +26,21 @@ p {
     color: white;
 }
 
+h1 {
+    margin: 5px;
+}
+
 #gameCanvas {
     /*
     width: 80%;
     height: 80%;
     */
-    width: 1000px;
-    height: 600px;
+    width: 1200px;
+    height: 700px;
 }
 #bufferCanvas {
     display: none;
 }
-
-
 
 /* LOGIN AND REGISTER */
 #loginForm {

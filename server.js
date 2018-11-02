@@ -31,27 +31,65 @@ if (err) throw err;
 
 //NETWORKING
 var updateRate = 30;
-var packetTimer = setInterval(sendPacket, 1000 / updateRate);
+var tickTimer = setInterval(serverTick, 1000 / updateRate);
 
-var usernames = {};
-var playersX = {};
-var playersY = {};
-var mapWidth = 100;
-var mapHeight = 100;
-var map = [];
-for(var i = 0; i <= mapWidth; i++) {
-    map[i] = [];
-}
-for(var y = 0; y < mapHeight; y++) {
-    for(var x = 0; x < mapWidth; x++) {
-        map[x][y] = 0;
+//CLASSES
+class Point {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    static add(p1, p2) {
+        return new Point(p1.x + p2.x, p1.y + p2.y)
     }
 }
+class Player {
+    constructor(username, location, moveSpeed) {
+        this.username = username;
+        this.location = location;
+        this.moveSpeed = moveSpeed;
+
+        this.beamStart = null;
+        this.beamEnd = null;
+    }
+}
+var players = {};
+class Map {
+    constructor(tileSize, width, height) {
+        this.tileSize = tileSize;
+        this.width = width;
+        this.height = height;
+        this.tile = [];
+        for(var i = 0; i <= width; i++) {
+            this.tile[i] = [];
+        }
+        for(var y = 0; y < width; y++) {
+            for(var x = 0; x < height; x++) {
+                this.tile[x][y] = 0;
+            }
+        }
+    }
+
+    addTiles(type, percentageChance) {
+        for(var y = 0; y < this.width; y++) {
+            for(var x = 0; x < this.height; x++) {
+                if(Math.random() * 100 <= percentageChance) {
+                    this.tile[x][y] = type;
+                }
+            }
+        }
+    }
+}
+var map = new Map(30, 100, 100);
+//ADDS RANDOM TREES
+map.addTiles(3, 2);
 
 io.on('connection', function(socket) {
     console.log('Socket connected', socket.id);
 
     socket.on('disconnect', function() {
+        delete players[socket.id];
         console.log('Socket disconnected', socket.id);
     });
 
@@ -64,9 +102,7 @@ io.on('connection', function(socket) {
         }
         DBconnection.query("SELECT password FROM planeturanium.users WHERE username = '" + username + "';" , function(err, result) {
             if(result[0] && passwordHash === result[0].password) {
-                usernames[socket.id] = username;
-                playersX[socket.id] = 0;
-                playersY[socket.id] = 0;
+                players[socket.id] = new Player(username, new Point(0, 0), 6, 0, 0);
                 socket.emit('LOGGED', socket.id);
             } else {
                 socket.emit('LOGINFAILED', 'Wrong username or password.')
@@ -92,41 +128,83 @@ io.on('connection', function(socket) {
         });
     });
 
-    socket.on('PLAYERPACKET', function(data) {
-        if(Math.abs(data.moveX) <= 1 && Math.abs(data.moveY) <= 1) {
-            var possibleMoveX = playersX[socket.id] + data.moveX;
-            var possibleMoveY = playersY[socket.id] + data.moveY;
-            if(insideMap(possibleMoveX, possibleMoveY)) {
-                playersX[socket.id] = possibleMoveX;
-                playersY[socket.id] = possibleMoveY;
+    socket.on('PLAYERPACKET', function(data) {  
+        //CHECKS THAT PLAYER OBJECT EXISTS
+        if(players[socket.id] === undefined) {
+            return;
+        }
 
-                //REMOVES ANY SOLID BLOCKS FROM PLAYERS LOCATION
-                map[playersX[socket.id]][playersY[socket.id]] = 0;
+        //CHECKS THAT VALUES ARE CORRECT AND IF THEY ARE FOR EXAMPLE SOMEONE IS TRYING TO HACK DROP THE PACKET
+        if(Math.abs(data.shoot.x) > 1 && Math.abs(data.shoot.y) > 1 || Math.abs(data.move.x) > 1 && Math.abs(data.move.y) > 1) {
+            return;
+        }
+
+        if(data.shooting) {
+            //RAYCASTS SHOOTING BEAM
+            //data.shoot = new Point(data.shoot.x * map.tileSize, data.shoot.y * map.tileSize);
+            players[socket.id].beamStart = Point.add(players[socket.id].location, data.shoot);
+            players[socket.id].beamEnd = Point.add(players[socket.id].location, data.shoot);
+            var shootingDistance = 0;
+            while(shootingDistance < 5 && locInsideMap(players[socket.id].beamEnd)) {
+                var hitPlayerID = getPlayerIDbyCoordinates(players[socket.id].beamEnd);
+                if(hitPlayerID) {
+                    players[socket.id].location = new Point(0, 0);
+                    break;
+                }/* else if(map.tile[players[socket.id].beamEnd.x / map.tileSize][players[socket.id].beamEnd.y / map.tileSize] !== 0) {
+                    break;
+                }*/
+                players[socket.id].beamEnd = Point.add(players[socket.id].beamEnd, new Point(data.shoot.x * shootingDistance * map.tileSize, data.shoot.y * shootingDistance * map.tileSize));
+                shootingDistance++;
             }
-        } 
-
-        if(data.tileX !== null && data.tileY !== null && insideMap(data.tileX, data.tileY)) {
-            map[data.tileX][data.tileY] = 1;
+        } else {
+            players[socket.id].beamStart = null;
+            players[socket.id].beamEnd = null;
+        }
+        
+        //MOVES PLAYER ACCORDING TO MOVEMENT SPEED
+        var possibleMove = new Point(players[socket.id].location.x + data.move.x * players[socket.id].moveSpeed, players[socket.id].location.y + data.move.y * players[socket.id].moveSpeed);
+        if(locInsideMap(possibleMove)) { 
+            players[socket.id].location = possibleMove;
+            //REMOVES ANY SOLID BLOCKS FROM PLAYERS LOCATION
+            //map[playersX[socket.id]][playersY[socket.id]] = 0;
+        }
+    
+        //PLACES BLOCKS THAT PLAYER WANTS TO PLACE
+        if(data.tile !== null && insideMap(data.tile)) {
+            map.tile[data.tile.x][data.tile.y] = 1;
         }
     });
 
 });
 
-function insideMap(x, y) {
-    if(x >= 0 && x <= mapWidth && y >= 0 && y <= mapHeight) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-function sendPacket() {
+function serverTick() {
     io.sockets.emit('SERVERPACKET', {
         map: map,
-        usernames: usernames,
-        playersX: playersX,
-        playersY: playersY
+        players: players
     });
+}
+
+function getPlayerIDbyCoordinates(p) {
+    for(var id in players) {
+        if(players[id].location.x === p.x && players[id].location.y === p.y) {
+            return id;
+        }
+    }
+    return false;
+}
+
+function insideMap(p) {
+    if(p.x >= 0 && p.x <= map.width && p.y >= 0 && p.y <= map.height) {
+        return true;
+    }
+    return false;
+}
+
+function locInsideMap(p) {
+    if(p.x >= 0 && p.x <= map.width * map.tileSize && p.y >= 0 && p.y <= map.height * map.tileSize) {
+        return true;
+    }
+    return false;
 }
 
 //HASH

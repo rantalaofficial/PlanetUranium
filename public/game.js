@@ -5,26 +5,32 @@ var targetFPS = 60;
 var fps = 0;
 var fpsCounter = 0;
 
-var gameWidth = 1000;
-var gameHeight = 600;
+var gameWidth = 1200;
+var gameHeight = 700;
 var gameCanvas;
 var ctx;
 var bufferCanvas;
 var bufferCTX;
 
 //MAP
-var tileSize = 30;
-var mapWidth = 100;
-var mapHeight = 100;
-var map = [];
-for(var i = 0; i <= mapWidth; i++) {
-    map[i] = [];
-}
-for(var y = 0; y < mapHeight; y++) {
-    for(var x = 0; x < mapWidth; x++) {
-        map[x][y] = 0;
+class Map {
+    constructor(tileSize, width, height) {
+        this.tileSize = tileSize;
+        this.width = width;
+        this.height = height;
+        this.tile = [];
+        for(var i = 0; i <= width; i++) {
+            this.tile[i] = [];
+        }
+        for(var y = 0; y < width; y++) {
+            for(var x = 0; x < height; x++) {
+                this.tile[x][y] = 0;
+            }
+        }
     }
 }
+var map = new Map(30, 100, 100);
+
 var starsX = [];
 var starsY = [];
 var starSize = 3;
@@ -39,28 +45,57 @@ for(var y = 0; y <= gameHeight; y += starSize) {
 
 //TEXTURES/ TILES
 var textures = [];
-for(var i = 0; i <= 3; i++) {
+var textureOffsetsX = [];
+var textureOffsetsY = [];
+for(var i = 0; i <= 5; i++) {
+    textureOffsetsX[i] = 0;
+    textureOffsetsY[i] = 0;
     textures[i] = new Image();
     textures[i].src = "/tiles/" + i + ".png";
 }
+textureOffsetsY[1] = -16;
+textureOffsetsX[3] = -30;
+textureOffsetsY[3] = -60;
+textureOffsetsY[5] = -160;
+textureOffsetsY[5] = -50;
+var bigTiles = [1, 3, 4, 5]
 var solidTiles = [1, 2];
 
 //PLAYER
+class Point {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    static add(p1, p2) {
+        return new Point(p1.x + p2.x, p1.y + p2.y)
+    }
+}
+class Player {
+    constructor(username, location, moveSpeed, beamStart, beamEnd) {
+        this.username = username;
+        this.location = location;
+        this.moveSpeed = moveSpeed;
+
+        this.beamStart = beamStart;
+        this.beamEnd = beamEnd;
+    }
+}
+var players = {};
+
 var placingDistance = 8;
 var shootingDistance = 14;
 var movementSpeed = 5;
 
-var usernames = {}
-var playersX = {};
-var playersY = {};
 var movementUpdates = 0;
-var moveDirectionX; 
-var moveDirectionY; 
-var playerTile;
+var moveDirection = new Point(0, 0);
+
 var shooting = false;
 var shootingDistance = 14;
-var shootingDirectionX;
-var shootingDirectionY;
+var shootingDirection = new Point(0, 0);
+
+var placedTile = null;
 
 //CONTROLS
 var keys = [];
@@ -70,14 +105,14 @@ $(document).on('keydown', function(e) {
 $(document).on('keyup', function(e) {
     keys[e.keyCode] = false;
 });
-var mouseX, mouseY;
+var mousePos = new Point(0, 0);
+
 var mouseTimer;
+var loopTimer;
 
 //NETWORKING
 var packet;
 var lastPacket;
-var placedTileX = null;
-var placedTileY = null;
 var socketID;
 
 $(document).ready(function() {
@@ -118,8 +153,7 @@ socket.on('LOGGED', function(data) {
     //MOUSE
     $(document).mousemove(function(event) {
         var position = gameCanvas.getBoundingClientRect()
-        mouseX = event.pageX - position.left;
-        mouseY = event.pageY - position.top;
+        mousePos = new Point(event.pageX - position.left, event.pageY - position.top);
     });
     $(document).mousedown(function() {
         mouseTimer = setInterval(mouseDown, 1000 / targetFPS);
@@ -130,10 +164,14 @@ socket.on('LOGGED', function(data) {
 
     //INTERVALS
     setInterval(secTimer, 1000);
-    setInterval(loop, 1000 / targetFPS);
+    loopTimer = setInterval(loop, 1000 / targetFPS);
 });
 
 socket.on('LOGINFAILED', function(data) {
+    location.href = 'index.html';
+});
+
+socket.on('disconnect', function() {
     location.href = 'index.html';
 });
 
@@ -141,43 +179,33 @@ function loop() {
     fpsCounter += 1;
 
     //MOVEMENT
-    movementUpdates++
-    moveDirectionX = 0;
-    moveDirectionY = 0;
-    if(movementUpdates > 10 - movementSpeed) {
-        movementUpdates = 0;
-        if(keys[87]) {moveDirectionY = -1; movedY = true;} 
-        if(keys[65]) {moveDirectionX = -1; movedX = true; } 
-        if(keys[83]) {moveDirectionY = 1; movedY = true;} 
-        if(keys[68]) {moveDirectionX = 1; movedX = true;}
-
-        if(moveDirectionX != 0 || moveDirectionY != 0) {
-            shootingDirectionX = moveDirectionX;
-            shootingDirectionY = moveDirectionY;
-        }
-    }
+    moveDirection = new Point(0,0);
+    if(keys[87]) {moveDirection.y = -1;} 
+    if(keys[65]) {moveDirection.x = -1;} 
+    if(keys[83]) {moveDirection.y = 1;} 
+    if(keys[68]) {moveDirection.x = 1;}
     //SHOOTING
+    if(moveDirection.x !== 0 || moveDirection.y !== 0) {
+        shootingDirection = moveDirection;
+    }
     if(keys[32]) {
         shooting = true;
     } else {
         shooting = false;
     }
 
-    playerTile = getTileCoordinates(gameCanvas.width / 2 + tileSize / 2, gameCanvas.height / 2 + tileSize / 2);
     sendPacket();
 }
 
 //NETWORKING
 function sendPacket() {
     packet = {
-        moveX: moveDirectionX,
-        moveY: moveDirectionY,
-        tileX: placedTileX,
-        tileY: placedTileY,
+        move: moveDirection,
+        shoot: shootingDirection,
+        tile: placedTile,
         shooting: shooting
     }
-    placedTileX = null;
-    placedTileY = null;
+    placedTile = null;
     /*
     if(!objectsEqual(packet, lastPacket)) {
         
@@ -192,15 +220,12 @@ socket.on('SERVERPACKET', function(data) {
         return;
     }
 
-    for(var y = 0; y < mapWidth; y++) {
-        for(var x = 0; x < mapHeight; x++) {
-            map[x][y] = data.map[x][y];
+    for(var y = 0; y < map.height; y++) {
+        for(var x = 0; x < map.width; x++) {
+            map.tile[x][y] = data.map.tile[x][y];
         }
     }
-
-    usernames = data.usernames;
-    playersX = data.playersX;
-    playersY = data.playersY;
+    players = data.players
 
     drawGrapichs();
 });
@@ -213,98 +238,95 @@ function drawGrapichs() {
     for(var i = 0; i < starsX.length; i++) {
         bufferCTX.fillRect(starsX[i], starsY[i], starSize, starSize);
     }
-    //TILES
-    for(var y = 0; y < mapHeight; y++) {
-        for(var x = 0; x < mapWidth; x++) {
-            var absolutePos = getAbsolutePosition(x, y);   
-            bufferCTX.drawImage(textures[map[x][y]], absolutePos[0], absolutePos[1]);
+    //TILES, DRAWS BIG TILES LAST SO THAT THEY ARE ON TOP
+    var bigTileLoc = [];
+    for(var y = 0; y < map.height; y++) {
+        for(var x = 0; x < map.width; x++) {
+            var absolutePos = getTilePosition(new Point(x, y));
+            var tileType = map.tile[x][y];
+            if(bigTiles.includes(tileType)) {
+                //DRAWS GROUND TO BIG TILES
+                bufferCTX.drawImage(textures[0], absolutePos.x + textureOffsetsX[0], absolutePos.y + textureOffsetsY[0]);
+                bigTileLoc.push(new Point(x, y));
+            } else {
+                bufferCTX.drawImage(textures[tileType], absolutePos.x + textureOffsetsX[tileType], absolutePos.y + textureOffsetsY[tileType]);
+            }
         }
     }
-    //PLAYERS
-    for(var id in playersX) {
-        var absolutePos = getAbsolutePosition(playersX[id], playersY[id]); 
-
-        bufferCTX.font = "15px Arial";
-        bufferCTX.fillText(usernames[id] ,absolutePos[0], absolutePos[1]);
-
-        bufferCTX.drawImage(textures[2], absolutePos[0], absolutePos[1]);
-    }  
     
-    //SHOOTING BEAM
-    if(shooting) {
-        var beamDistance = getMaxShootingDistance();
-        if(beamDistance > 1) {        
+    for(var id in players) {
+        //PLAYERS
+        var loc = getAbsolutePosition(players[id].location); 
+        bufferCTX.font = "15px Arial";
+        bufferCTX.fillText(players[id].username ,loc.x, loc.y);
+        bufferCTX.drawImage(textures[2], loc.x, loc.y);
+
+        //BEAMS
+        if(players[id].beamStart !== null) {
             bufferCTX.strokeStyle = 'red';
             bufferCTX.lineWidth = 10;
             bufferCTX.beginPath();
-            var startingPos = getAbsolutePosition(playersX[socketID] + shootingDirectionX, playersY[socketID] + shootingDirectionY)
-            var endingPos = getAbsolutePosition(playersX[socketID] + shootingDirectionX * beamDistance, playersY[socketID] + shootingDirectionY * beamDistance);
-            startingPos[0] += tileSize / 2;
-            endingPos[0] += tileSize / 2;
-            startingPos[1] += tileSize / 2;
-            endingPos[1] += tileSize / 2;
-            bufferCTX.moveTo(startingPos[0], startingPos[1]);
-            bufferCTX.lineTo(endingPos[0], endingPos[1]);
+            var beamStart = getAbsolutePosition(players[id].beamStart);
+            beamStart = Point.add(beamStart, new Point(map.tileSize / 2, map.tileSize / 2))
+
+            var beamEnd = getAbsolutePosition(players[id].beamEnd);
+            beamEnd = Point.add(beamEnd, new Point(map.tileSize / 2, map.tileSize / 2))
+
+            console.log(beamStart);
+            console.log(beamEnd);
+
+            bufferCTX.moveTo(beamStart.x, beamStart.y);
+            bufferCTX.lineTo(beamEnd.x, beamEnd.y);
             bufferCTX.stroke();
-            bufferCTX.lineWidth = 1;
+        }
+    }  
+
+    //DRAWS BIG TILES
+    if(bigTileLoc.length > 0) {
+        for(var i = 0; i < bigTileLoc.length; i++) {
+            var loc = bigTileLoc[i];
+            var tileType = map.tile[loc.x][loc.y];
+            var absolutePos = getTilePosition(new Point(loc.x, loc.y)); 
+            bufferCTX.drawImage(textures[tileType], absolutePos.x + textureOffsetsX[tileType], absolutePos.y + textureOffsetsY[tileType]);
         }
     }
-
+    
     //MOUSE POINTER
     bufferCTX.fillStyle = 'white';
-    bufferCTX.fillRect(mouseX, mouseY, 5, 5);
+    bufferCTX.fillRect(mousePos.x, mousePos.y, 5, 5);
 
     //INFO
     bufferCTX.font = "20px Arial";
-    bufferCTX.fillText("FPS:" + fps + " x: " + playersX[socketID] + " y: " + playersY[socketID], 2, 20);
+    bufferCTX.fillText("FPS:" + fps + " x: " + players[socketID].location.x + " y: " + players[socketID].location.y, 2, 20);
     ctx.drawImage(bufferCanvas, 0, 0);
 }
 
-function getMaxShootingDistance() {
-    var maxShootingDistance = 0;
-    var x = playersX[socketID]
-    var y = playersX[socketID]
-    while(maxShootingDistance <= shootingDistance) {
-        if(x < 0 || y < 0 || x > mapWidth || y > mapHeight) {
-            return shootingDistance;
-        }
-
-        if(!solidTiles.includes(map[x][y])) {
-            maxShootingDistance++;
-        } else {
-            return maxShootingDistance;
-        }
-
-        x += shootingDirectionX;
-        y += shootingDirectionY;
-    }
-
-    return maxShootingDistance;
-}
-
-function getAbsolutePosition(x, y) {
-    var absoluteX = x * tileSize - playersX[socketID] * tileSize + gameWidth / 2;
-    var absoluteY = y * tileSize - playersY[socketID] * tileSize + gameHeight / 2;
-    return [absoluteX, absoluteY];
+function getTilePosition(p) {
+    var absoluteX = p.x * map.tileSize - players[socketID].location.x + gameWidth / 2;
+    var absoluteY = p.y * map.tileSize - players[socketID].location.y + gameHeight / 2;
+    return new Point(absoluteX, absoluteY);
 } 
 
+function getAbsolutePosition(p) {
+    var absoluteX = p.x - players[socketID].location.x + gameWidth / 2;
+    var absoluteY = p.y - players[socketID].location.y + gameHeight / 2;
+    return new Point(absoluteX, absoluteY);
+}
+
 function mouseDown() {
-    var pos = getTileCoordinates(mouseX, mouseY);
+    var pos = getTileCoordinates(mousePos);
     //CHECKS THAT PLACE IS INSIDE MAX PLACING DISTANCE
     if(pos) {
-        if(Math.abs(playersX[socketID] - pos[0]) <= placingDistance && Math.abs(playersY[socketID] - pos[1]) <= placingDistance) {
-            placedTileX = pos[0];
-            placedTileY = pos[1];
-        }
+        placedTile = pos;
     }
 }
 
-function getTileCoordinates(locX, locY) {
-    for(var y = 0; y <= mapHeight; y++) {
-        for(var x = 0; x <= mapWidth; x++) {
-            var absolutePos = getAbsolutePosition(x,y);
-            if(locX >= absolutePos[0] && locX < absolutePos[0] + tileSize && locY >= absolutePos[1] && locY < absolutePos[1] + tileSize) {
-                return [x, y];
+function getTileCoordinates(p) {
+    for(var y = 0; y <= map.height; y++) {
+        for(var x = 0; x <= map.width; x++) {
+            var absolutePos = getTilePosition(new Point(x, y));
+            if(p.x >= absolutePos.x && p.x < absolutePos.x + map.tileSize && p.y >= absolutePos.y && p.y < absolutePos.y + map.tileSize) {
+                return new Point(x, y);
             }
         }
     }
