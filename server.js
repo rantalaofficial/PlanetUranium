@@ -1,12 +1,12 @@
-var express = require('express');
-var socket = require('socket.io');
-var mysql = require('mysql');
-var crypto = require('crypto');
+let express = require('express');
+let socket = require('socket.io');
+let mysql = require('mysql');
+let crypto = require('crypto');
 
 //APP SETUP
-var serverPort = 8080;
-var app = express();
-var server = app.listen(serverPort, function() {
+let serverPort = 8080;
+let app = express();
+let server = app.listen(serverPort, function() {
 	console.log("Server started on port: " + serverPort)
 });
 app.use(function(req, res, next) {
@@ -15,10 +15,10 @@ app.use(function(req, res, next) {
     next();
 });
 app.use(express.static('public'));
-var io = socket(server);
+let io = socket(server);
 
 //MYSQL DATABASE
-var DBconnection = mysql.createConnection({
+let DBconnection = mysql.createConnection({
     host: "localhost",
     user: "user",
     password: "hFxKMZZF5yir5FpI",
@@ -30,8 +30,8 @@ if (err) throw err;
 });
 
 //NETWORKING
-var updateRate = 30;
-var tickTimer = setInterval(serverTick, 1000 / updateRate);
+let updateRate = 30;
+let tickTimer = setInterval(serverTick, 1000 / updateRate);
 
 //CLASSES
 class Point {
@@ -54,26 +54,26 @@ class Player {
         this.beamEnd = null;
     }
 }
-var players = {};
+let players = {};
 class Map {
     constructor(tileSize, width, height) {
         this.tileSize = tileSize;
         this.width = width;
         this.height = height;
         this.tile = [];
-        for(var i = 0; i <= width; i++) {
+        for(let i = 0; i <= width; i++) {
             this.tile[i] = [];
         }
-        for(var y = 0; y < width; y++) {
-            for(var x = 0; x < height; x++) {
+        for(let y = 0; y < width; y++) {
+            for(let x = 0; x < height; x++) {
                 this.tile[x][y] = 0;
             }
         }
     }
 
     addTiles(type, percentageChance) {
-        for(var y = 0; y < this.width; y++) {
-            for(var x = 0; x < this.height; x++) {
+        for(let y = 0; y < this.width; y++) {
+            for(let x = 0; x < this.height; x++) {
                 if(Math.random() * 100 <= percentageChance) {
                     this.tile[x][y] = type;
                 }
@@ -81,7 +81,7 @@ class Map {
         }
     }
 }
-var map = new Map(30, 100, 100);
+let map = new Map(30, 30, 30);
 //ADDS RANDOM TREES
 map.addTiles(3, 2);
 
@@ -94,8 +94,8 @@ io.on('connection', function(socket) {
     });
 
     socket.on('LOGIN', function(data) {
-        var username = data.username;
-        var passwordHash = hash256(data.password);
+        let username = data.username;
+        let passwordHash = hash256(data.password);
 
         if(!username || !passwordHash) {
             return;
@@ -103,6 +103,7 @@ io.on('connection', function(socket) {
         DBconnection.query("SELECT password FROM planeturanium.users WHERE username = '" + username + "';" , function(err, result) {
             if(result[0] && passwordHash === result[0].password) {
                 players[socket.id] = new Player(username, new Point(0, 0), 6, 0, 0);
+                respawnPlayer(socket.id);
                 socket.emit('LOGGED', socket.id);
             } else {
                 socket.emit('LOGINFAILED', 'Wrong username or password.')
@@ -111,8 +112,8 @@ io.on('connection', function(socket) {
     });
 
     socket.on('REGISTER', function(data) {
-        var username = data.username;
-        var passwordHash = hash256(data.password);
+        let username = data.username;
+        let passwordHash = hash256(data.password);
 
         if(!onlyLetters(username) || username.length < 6 || username.length > 20 ) {
             socket.emit('REGISTERFAILED', 'Username can only contain letters and numbers and it must be between 6 and 20 characters long.')
@@ -123,7 +124,7 @@ io.on('connection', function(socket) {
                 socket.emit('REGISTERFAILED', 'That username is already in use.')
             } else {
                 socket.emit('REGISTERED', '');
-                console.log('REGISTERED', data.username);
+                console.log('REGISTERED NEW PLAYER', data.username);
             }
         });
     });
@@ -141,19 +142,26 @@ io.on('connection', function(socket) {
 
         if(data.shooting) {
             //RAYCASTS SHOOTING BEAM
-            //data.shoot = new Point(data.shoot.x * map.tileSize, data.shoot.y * map.tileSize);
-            players[socket.id].beamStart = Point.add(players[socket.id].location, data.shoot);
-            players[socket.id].beamEnd = Point.add(players[socket.id].location, data.shoot);
-            var shootingDistance = 0;
-            while(shootingDistance < 5 && locInsideMap(players[socket.id].beamEnd)) {
-                var hitPlayerID = getPlayerIDbyCoordinates(players[socket.id].beamEnd);
-                if(hitPlayerID) {
-                    players[socket.id].location = new Point(0, 0);
+            let startingPoint = Point.add(players[socket.id].location, new Point(map.tileSize / 2 + map.tileSize * data.shoot.x, map.tileSize / 2 + map.tileSize * data.shoot.y));
+            players[socket.id].beamStart = startingPoint
+            players[socket.id].beamEnd = startingPoint;
+            let shootingDistance = 0;
+            while(shootingDistance < map.tileSize * 2 && locInsideMap(players[socket.id].beamEnd)) {
+                //TEST IF HIT BLOCK
+                let thisTile = getTileCoordinates(players[socket.id].beamEnd);
+                if(thisTile) {
+                    if(map.tile[thisTile.x][thisTile.y] !== 0) {
+                        break;
+                    }
+                }
+                //TEST PLAYER HIT
+                let playerHitID = getPlayersInRadius(socket.id , players[socket.id].beamEnd, map.tileSize / 2);
+                if(playerHitID) {
+                    respawnPlayer(playerHitID);
                     break;
-                }/* else if(map.tile[players[socket.id].beamEnd.x / map.tileSize][players[socket.id].beamEnd.y / map.tileSize] !== 0) {
-                    break;
-                }*/
-                players[socket.id].beamEnd = Point.add(players[socket.id].beamEnd, new Point(data.shoot.x * shootingDistance * map.tileSize, data.shoot.y * shootingDistance * map.tileSize));
+                }
+                //RAYCAST
+                players[socket.id].beamEnd = Point.add(players[socket.id].beamEnd, new Point(data.shoot.x * 5, data.shoot.y * 5));
                 shootingDistance++;
             }
         } else {
@@ -162,11 +170,12 @@ io.on('connection', function(socket) {
         }
         
         //MOVES PLAYER ACCORDING TO MOVEMENT SPEED
-        var possibleMove = new Point(players[socket.id].location.x + data.move.x * players[socket.id].moveSpeed, players[socket.id].location.y + data.move.y * players[socket.id].moveSpeed);
+        let possibleMove = new Point(players[socket.id].location.x + data.move.x * players[socket.id].moveSpeed, players[socket.id].location.y + data.move.y * players[socket.id].moveSpeed);
         if(locInsideMap(possibleMove)) { 
             players[socket.id].location = possibleMove;
             //REMOVES ANY SOLID BLOCKS FROM PLAYERS LOCATION
-            //map[playersX[socket.id]][playersY[socket.id]] = 0;
+            let thisTile = getTileCoordinates(getPlayerCenter(socket.id));
+            map.tile[thisTile.x][thisTile.y] = 0;
         }
     
         //PLACES BLOCKS THAT PLAYER WANTS TO PLACE
@@ -178,16 +187,46 @@ io.on('connection', function(socket) {
 });
 
 function serverTick() {
+    let date = new Date();
+    let timestamp = date.getTime();
     io.sockets.emit('SERVERPACKET', {
+        timestamp: timestamp,
         map: map,
         players: players
     });
 }
 
-function getPlayerIDbyCoordinates(p) {
-    for(var id in players) {
-        if(players[id].location.x === p.x && players[id].location.y === p.y) {
+function respawnPlayer(id) {
+    players[id].location.x = Math.round(Math.random() * (map.width - 1) * map.tileSize);
+    players[id].location.y = Math.round(Math.random() * (map.height - 1) * map.tileSize);
+}
+
+function getPlayersInRadius(self ,location, searchRadius) {
+    for(id in players) {
+        if(id === self) {
+            continue;
+        }
+
+        //CALCULATES THE PLAYERS CENTER COORDINATES FROM THE TOP LEFT COORDINATES
+        let centerLocation = getPlayerCenter(id);
+
+        if(centerLocation.x >= location.x - searchRadius && centerLocation.x <= location.x + searchRadius && 
+            centerLocation.y >= location.y - searchRadius && centerLocation.y <= location.y + searchRadius) {
             return id;
+        }
+    }
+}
+
+function getPlayerCenter(id) {
+    return new Point(players[id].location.x + map.tileSize / 2, players[id].location.y + map.tileSize / 2);
+}
+
+function getTileCoordinates(p) {
+    for(let y = 0; y <= map.height; y++) {
+        for(let x = 0; x <= map.width; x++) {
+            if(p.x >= x * map.tileSize && p.x < x * map.tileSize + map.tileSize && p.y >= y * map.tileSize && p.y < y * map.tileSize + map.tileSize) {
+                return new Point(x, y);
+            }
         }
     }
     return false;
@@ -210,7 +249,7 @@ function locInsideMap(p) {
 //HASH
 function hash256(text) {
     if(text) {
-        var sha256 = crypto.createHash('sha256');
+        let sha256 = crypto.createHash('sha256');
         return sha256.update(text).digest('hex');
     }
 }
