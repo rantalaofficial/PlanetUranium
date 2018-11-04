@@ -1,7 +1,8 @@
-let express = require('express');
-let socket = require('socket.io');
-let mysql = require('mysql');
-let crypto = require('crypto');
+const express = require('express');
+const socket = require('socket.io');
+const mysql = require('mysql');
+const crypto = require('crypto');
+const U = require('./Uranium2DServerEngine');
 
 //APP SETUP
 let serverPort = 8080;
@@ -30,60 +31,17 @@ if (err) throw err;
 });
 
 //NETWORKING
-let updateRate = 30;
-let tickTimer = setInterval(serverTick, 1000 / updateRate);
+let updateRate = 80;
+setInterval(serverTick, 1000 / updateRate);
 
-//CLASSES
-class Point {
-    constructor(x, y) {
-        this.x = x;
-        this.y = y;
-    }
-
-    static add(p1, p2) {
-        return new Point(p1.x + p2.x, p1.y + p2.y)
-    }
-}
-class Player {
-    constructor(username, location, moveSpeed) {
-        this.username = username;
-        this.location = location;
-        this.moveSpeed = moveSpeed;
-
-        this.beamStart = null;
-        this.beamEnd = null;
-    }
-}
 let players = {};
-class Map {
-    constructor(tileSize, width, height) {
-        this.tileSize = tileSize;
-        this.width = width;
-        this.height = height;
-        this.tile = [];
-        for(let i = 0; i <= width; i++) {
-            this.tile[i] = [];
-        }
-        for(let y = 0; y < width; y++) {
-            for(let x = 0; x < height; x++) {
-                this.tile[x][y] = 0;
-            }
-        }
-    }
 
-    addTiles(type, percentageChance) {
-        for(let y = 0; y < this.width; y++) {
-            for(let x = 0; x < this.height; x++) {
-                if(Math.random() * 100 <= percentageChance) {
-                    this.tile[x][y] = type;
-                }
-            }
-        }
-    }
-}
-let map = new Map(30, 30, 30);
-//ADDS RANDOM TREES
+let map = new U.Map(30, 100, 100);
 map.addTiles(3, 2);
+
+let chat = new U.Chat(300);
+chat.addMessage("SERVER", "SERVER STARTED :D", "red");
+
 
 io.on('connection', function(socket) {
     console.log('Socket connected', socket.id);
@@ -102,9 +60,14 @@ io.on('connection', function(socket) {
         }
         DBconnection.query("SELECT password FROM planeturanium.users WHERE username = '" + username + "';" , function(err, result) {
             if(result[0] && passwordHash === result[0].password) {
-                players[socket.id] = new Player(username, new Point(0, 0), 6, 0, 0);
+                players[socket.id] = new U.Player(username, new U.Point(0, 0), 6, 0, 0);
                 respawnPlayer(socket.id);
-                socket.emit('LOGGED', socket.id);
+                socket.emit('LOGGED', {
+                    socketID: socket.id,
+                    map: map,
+                    players: players,
+                    chat: chat.messages
+                });
             } else {
                 socket.emit('LOGINFAILED', 'Wrong username or password.')
             }
@@ -130,8 +93,8 @@ io.on('connection', function(socket) {
     });
 
     socket.on('PLAYERPACKET', function(data) {  
-        //CHECKS THAT PLAYER OBJECT EXISTS
-        if(players[socket.id] === undefined) {
+        //CHECKS THAT PLAYER OBJECT EXISTS AND HAS USERNAME
+        if(players[socket.id] === undefined && players[socket.id] === undefined) {
             return;
         }
 
@@ -140,9 +103,14 @@ io.on('connection', function(socket) {
             return;
         }
 
+        //CHAT
+        if(data.message !== undefined && data.message !== null && data.message.length > 0 && data.message.length < 100) {
+            chat.addMessage(players[socket.id].username, data.message, 'green');
+        }
+
         if(data.shooting) {
             //RAYCASTS SHOOTING BEAM
-            let startingPoint = Point.add(players[socket.id].location, new Point(map.tileSize / 2 + map.tileSize * data.shoot.x, map.tileSize / 2 + map.tileSize * data.shoot.y));
+            let startingPoint = U.Point.add(players[socket.id].location, new U.Point(map.tileSize / 2 + map.tileSize * data.shoot.x, map.tileSize / 2 + map.tileSize * data.shoot.y));
             players[socket.id].beamStart = startingPoint
             players[socket.id].beamEnd = startingPoint;
             let shootingDistance = 0;
@@ -161,7 +129,7 @@ io.on('connection', function(socket) {
                     break;
                 }
                 //RAYCAST
-                players[socket.id].beamEnd = Point.add(players[socket.id].beamEnd, new Point(data.shoot.x * 5, data.shoot.y * 5));
+                players[socket.id].beamEnd = U.Point.add(players[socket.id].beamEnd, new U.Point(data.shoot.x * 5, data.shoot.y * 5));
                 shootingDistance++;
             }
         } else {
@@ -170,30 +138,38 @@ io.on('connection', function(socket) {
         }
         
         //MOVES PLAYER ACCORDING TO MOVEMENT SPEED
-        let possibleMove = new Point(players[socket.id].location.x + data.move.x * players[socket.id].moveSpeed, players[socket.id].location.y + data.move.y * players[socket.id].moveSpeed);
+        let possibleMove = new U.Point(players[socket.id].location.x + data.move.x * players[socket.id].moveSpeed, players[socket.id].location.y + data.move.y * players[socket.id].moveSpeed);
         if(locInsideMap(possibleMove)) { 
             players[socket.id].location = possibleMove;
             //REMOVES ANY SOLID BLOCKS FROM PLAYERS LOCATION
             let thisTile = getTileCoordinates(getPlayerCenter(socket.id));
-            map.tile[thisTile.x][thisTile.y] = 0;
+            map.pushTileUpdate(thisTile, 0);
         }
     
         //PLACES BLOCKS THAT PLAYER WANTS TO PLACE
         if(data.tile !== null && insideMap(data.tile)) {
-            map.tile[data.tile.x][data.tile.y] = 1;
+            map.pushTileUpdate(data.tile, 1);
         }
     });
 
 });
 
 function serverTick() {
-    let date = new Date();
-    let timestamp = date.getTime();
-    io.sockets.emit('SERVERPACKET', {
-        timestamp: timestamp,
-        map: map,
-        players: players
-    });
+    packet = {
+        updatedTiles: map.updatedTiles,
+        updatedTileTypes: map.updatedTileTypes,
+        players: players,
+        chat: null
+    }
+    //IF CHAT HAS NEW MESSAGES ADDS THEM TO PACKET
+    if(chat.chatUpdated) {
+        packet.chat = chat.messages;
+    }
+
+    chat.chatUpdated = false;
+    map.clearTileUpdates();
+
+    io.sockets.emit('SERVERPACKET', packet);
 }
 
 function respawnPlayer(id) {
@@ -218,14 +194,14 @@ function getPlayersInRadius(self ,location, searchRadius) {
 }
 
 function getPlayerCenter(id) {
-    return new Point(players[id].location.x + map.tileSize / 2, players[id].location.y + map.tileSize / 2);
+    return new U.Point(players[id].location.x + map.tileSize / 2, players[id].location.y + map.tileSize / 2);
 }
 
 function getTileCoordinates(p) {
     for(let y = 0; y <= map.height; y++) {
         for(let x = 0; x <= map.width; x++) {
             if(p.x >= x * map.tileSize && p.x < x * map.tileSize + map.tileSize && p.y >= y * map.tileSize && p.y < y * map.tileSize + map.tileSize) {
-                return new Point(x, y);
+                return new U.Point(x, y);
             }
         }
     }
