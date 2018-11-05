@@ -44,11 +44,11 @@ chat.addMessage("SERVER", "SERVER STARTED :D", "red");
 
 
 io.on('connection', function(socket) {
-    console.log('Socket connected', socket.id);
+    //console.log('Socket connected', socket.id);
 
     socket.on('disconnect', function() {
         delete players[socket.id];
-        console.log('Socket disconnected', socket.id);
+        //console.log('Socket disconnected', socket.id);
     });
 
     socket.on('LOGIN', function(data) {
@@ -60,7 +60,8 @@ io.on('connection', function(socket) {
         }
         DBconnection.query("SELECT password FROM planeturanium.users WHERE username = '" + username + "';" , function(err, result) {
             if(result[0] && passwordHash === result[0].password) {
-                players[socket.id] = new U.Player(username, new U.Point(0, 0), 6, 0, 0);
+                players[socket.id] = new U.Player(username, new U.Point(0, 0), 0.1, 6);
+                console.log(players[socket.id].health);
                 respawnPlayer(socket.id);
                 socket.emit('LOGGED', {
                     socketID: socket.id,
@@ -114,7 +115,7 @@ io.on('connection', function(socket) {
             players[socket.id].beamStart = startingPoint
             players[socket.id].beamEnd = startingPoint;
             let shootingDistance = 0;
-            while(shootingDistance < map.tileSize * 2 && locInsideMap(players[socket.id].beamEnd)) {
+            while(shootingDistance < map.tileSize * 2 && obgInsideMap(players[socket.id].beamEnd, 0)) {
                 //TEST IF HIT BLOCK
                 let thisTile = getTileCoordinates(players[socket.id].beamEnd);
                 if(thisTile) {
@@ -125,7 +126,11 @@ io.on('connection', function(socket) {
                 //TEST PLAYER HIT
                 let playerHitID = getPlayersInRadius(socket.id , players[socket.id].beamEnd, map.tileSize / 2);
                 if(playerHitID) {
-                    respawnPlayer(playerHitID);
+                    players[playerHitID].health -= 3;
+                    if(players[playerHitID].health < 1) {
+                        players[playerHitID].health = 100;
+                        respawnPlayer(playerHitID);
+                    }
                     break;
                 }
                 //RAYCAST
@@ -137,13 +142,21 @@ io.on('connection', function(socket) {
             players[socket.id].beamEnd = null;
         }
         
-        //MOVES PLAYER ACCORDING TO MOVEMENT SPEED
+        //MOVES PLAYER
         let possibleMove = new U.Point(players[socket.id].location.x + data.move.x * players[socket.id].moveSpeed, players[socket.id].location.y + data.move.y * players[socket.id].moveSpeed);
-        if(locInsideMap(possibleMove)) { 
-            players[socket.id].location = possibleMove;
-            //REMOVES ANY SOLID BLOCKS FROM PLAYERS LOCATION
-            let thisTile = getTileCoordinates(getPlayerCenter(socket.id));
-            map.pushTileUpdate(thisTile, 0);
+        if(obgInsideMap(new U.Point(possibleMove.x, 0), map.tileSize)) { 
+            players[socket.id].location.x = possibleMove.x;
+        }
+        if(obgInsideMap(new U.Point(0, possibleMove.y), map.tileSize)) { 
+            players[socket.id].location.y = possibleMove.y;
+        }
+        //REMOVES ANY SOLID BLOCKS FROM PLAYERS LOCATION
+        let thisTile = getTileCoordinates(getPlayerCenter(socket.id));
+        map.pushTileUpdate(thisTile, 0);    
+        
+        //HEALTH REGEN
+        if(players[socket.id].health < 100) {
+            players[socket.id].health += players[socket.id].healthRegen;
         }
     
         //PLACES BLOCKS THAT PLAYER WANTS TO PLACE
@@ -215,8 +228,8 @@ function insideMap(p) {
     return false;
 }
 
-function locInsideMap(p) {
-    if(p.x >= 0 && p.x <= map.width * map.tileSize && p.y >= 0 && p.y <= map.height * map.tileSize) {
+function obgInsideMap(p, objSize) {
+    if(p.x >= 0 && p.x + objSize <= map.width * map.tileSize && p.y >= 0 && p.y + objSize <= map.height * map.tileSize) {
         return true;
     }
     return false;

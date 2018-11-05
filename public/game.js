@@ -41,7 +41,9 @@ let moveDirection = new U.Point(0, 0);
 let shooting = false;
 let shootingDirection = new U.Point(0, 0);
 let placedTile = null;
+
 let chatMessage = null;
+let chatShown = false;
 
 //CONTROLS
 let keys = [];
@@ -90,10 +92,13 @@ socket.on('LOGGED', function(data) {
         let position = gameCanvas.getBoundingClientRect()
         mousePos = new U.Point(event.pageX - position.left, event.pageY - position.top);
     });
-    $(document).mousedown(function() {
-        mouseTimer = setInterval(mouseDown, 1000 / targetFPS);
+    $(document).mousedown(function(e) {
+        if(e.target.id == "gameCanvas") {
+            //DETECTS CLICKS ONLY ON CANVAS
+            mouseTimer = setInterval(mouseDown, 1000 / targetFPS);
+        }
     });
-    $(document).mouseup(function() {
+    $(document).mouseup(function(e) {
         clearInterval(mouseTimer);
     });
 
@@ -130,17 +135,35 @@ socket.on('disconnect', function() {
 });
 
 function loop() {
-    //MOVEMENT
-    moveDirection = new U.Point(0,0);
-    if(keys[87]) {moveDirection.y = -1;} 
-    if(keys[65]) {moveDirection.x = -1;} 
-    if(keys[83]) {moveDirection.y = 1;} 
-    if(keys[68]) {moveDirection.x = 1;}
-    //SHOOTING
-    if(moveDirection.x !== 0 || moveDirection.y !== 0) {
-        shootingDirection = moveDirection;
+    //CHAT
+    if(keys[67]) {
+        chatShown = true;
+        $('#chatMessageBox').focus();
+        $('#chatMessageBox').attr("placeholder", "Press ESC to hide chat");
+
+        $('#chatContainer').css('opacity', '0.9');
+        $('#chatContainer').css('pointer-events', 'all');
+    } else if(keys[27]) {
+        chatShown = false;
+        $('#chatMessageBox').blur();
+        $('#chatMessageBox').attr("placeholder", "Press C to chat");
+
+        $('#chatContainer').css('opacity', '0.6');
+        $('#chatContainer').css('pointer-events', 'none');
     }
-    if(keys[32]) {shooting = true;} else {shooting = false;}
+
+    //GAME CONTROLS, CHECK ONLY WHEN CHAT NOT SHOWN
+    moveDirection = new U.Point(0,0);
+    if(chatShown == false) {
+        if(keys[87]) {moveDirection.y = -1;} 
+        if(keys[65]) {moveDirection.x = -1;} 
+        if(keys[83]) {moveDirection.y = 1;} 
+        if(keys[68]) {moveDirection.x = 1;}
+        if(moveDirection.x !== 0 || moveDirection.y !== 0) {
+            shootingDirection = moveDirection;
+        }
+        if(keys[32]) {shooting = true;} else {shooting = false;}
+    }
 
     sendPacket();
     drawGrapichs();
@@ -207,26 +230,11 @@ function drawGrapichs() {
     }
     
     for(let id in players) {
-        //BEAMS
+        //PLAYERS
         if(players[id].beamStart !== null) {
-            bufferCTX.strokeStyle = 'red';
-            bufferCTX.lineWidth = 10;
-            bufferCTX.beginPath();
-            let beamStart = getAbsolutePosition(players[id].beamStart);
-            let beamEnd = getAbsolutePosition(players[id].beamEnd);
-            bufferCTX.moveTo(beamStart.x, beamStart.y);
-            bufferCTX.lineTo(beamEnd.x, beamEnd.y);
-            bufferCTX.stroke();
+            bufferCTX = U.Player.drawBeam(bufferCTX, getAbsolutePosition(players[id].beamStart), getAbsolutePosition(players[id].beamEnd));
         }
-
-        let loc = getAbsolutePosition(players[id].location); 
-        //IF PLAYER OUTSIDE GAME SKIPS TO NEXT PLAYER
-        if(!insideGameWindow(loc)) {
-            continue;
-        }
-        bufferCTX.font = "15px Arial";
-        bufferCTX.fillText(players[id].username ,loc.x, loc.y);
-        bufferCTX.drawImage(textures[2].image, loc.x, loc.y);
+        bufferCTX = U.Player.drawPlayer(bufferCTX, textures[2].image, players[id], players[socketID].location);
     }  
 
     //DRAWS BIG TILES
@@ -243,9 +251,11 @@ function drawGrapichs() {
     bufferCTX.fillStyle = 'white';
     bufferCTX.fillRect(mousePos.x, mousePos.y, 5, 5);
 
-    //INFO
+    /*INFO TEXT 
     bufferCTX.font = "20px Arial";
     bufferCTX.fillText("FPS:" + fps + " x: " + players[socketID].location.x + " y: " + players[socketID].location.y, 2, 20);
+    */
+
     ctx.drawImage(bufferCanvas, 0, 0);
 }
 
@@ -296,21 +306,6 @@ function getTileCoordinates(p) {
         }
     }
     return false;
-}
-
-function objectsEqual(a, b) {
-    let aProps = Object.getOwnPropertyNames(a);
-    let bProps = Object.getOwnPropertyNames(b);
-    if (aProps.length != bProps.length) {
-        return false;
-    }
-    for (let i = 0; i < aProps.length; i++) {
-        let propName = aProps[i];
-        if (a[propName] !== b[propName]) {
-            return false;
-        }
-    }
-    return true;
 }
 
 function secTimer() {

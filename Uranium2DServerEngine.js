@@ -9,9 +9,13 @@ class Point {
     }
 }
 class Player {
-    constructor(username, location, moveSpeed) {
+    constructor(username, location, healthRegen, moveSpeed) {
         this.username = username;
         this.location = location;
+
+        this.healthRegen = healthRegen;
+        this.health = 100;
+
         this.moveSpeed = moveSpeed;
 
         this.beamStart = null;
