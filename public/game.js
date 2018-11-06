@@ -7,8 +7,6 @@ let targetFPS = 60;
 let fps = 0;
 let fpsCounter = 0;
 
-let gameWidth = 1200;
-let gameHeight = 700;
 //RENDERS ONLY STUFF THAT IS INSIDE GAME
 let extraDrawDistance = 100; //PIXELS
 let gameCanvas;
@@ -16,7 +14,19 @@ let ctx;
 let bufferCanvas;
 let bufferCTX;
 
-//GAME
+//TEXTURES/ TILES
+let textures = [];
+textures.push(new U.Texture('/recources/0.png', false, new U.Point(0, 0)));
+textures.push(new U.Texture('/recources/1.png', true, new U.Point(0, -16)));
+textures.push(new U.Texture('/recources/2.png', false, new U.Point(0, 0)));
+textures.push(new U.Texture('/recources/3.png', true, new U.Point(-30, -60)));
+textures.push(new U.Texture('/recources/4.png', true, new U.Point(0, 0)));
+
+//WORK IN PROGRESS
+let gameWidth = 1200;
+let gameHeight = 700;
+
+let game;
 let map;
 let players = {};
 let stars = []
@@ -29,18 +39,11 @@ for(let y = 0; y <= gameHeight; y += starSize) {
     }
 }
 
-//TEXTURES/ TILES
-let textures = [];
-textures.push(new U.Texture('/recources/0.png', false, new U.Point(0, 0)));
-textures.push(new U.Texture('/recources/1.png', true, new U.Point(0, -16)));
-textures.push(new U.Texture('/recources/2.png', false, new U.Point(0, 0)));
-textures.push(new U.Texture('/recources/3.png', true, new U.Point(-30, -60)));
-textures.push(new U.Texture('/recources/4.png', true, new U.Point(0, 0)));
-
 let moveDirection = new U.Point(0, 0);
 let shooting = false;
 let shootingDirection = new U.Point(0, 0);
 let placedTile = null;
+let clickedButtonID = null;
 
 let chatMessage = null;
 let chatShown = false;
@@ -116,8 +119,16 @@ socket.on('LOGGED', function(data) {
         }
     });
 
+    //BUTTONS
+    $('#guiBtn0').click(function() {clickedButtonID = 0;});
+    $('#guiBtn1').click(function() {clickedButtonID = 1;});
+    $('#guiBtn2').click(function() {clickedButtonID = 2;});
+    $('#guiBtn3').click(function() {clickedButtonID = 3;});
+
     //INIT GAME
+    game = new U.Game(bufferCTX, 1200, 700, socketID, map, textures);
     map = data.map;
+    game.map = data.map;
     players = data.players;
     renderChat(data.chat);
 
@@ -176,10 +187,12 @@ function sendPacket() {
         shoot: shootingDirection,
         tile: placedTile,
         shooting: shooting,
-        message: chatMessage
+        message: chatMessage,
+        clickedButtonID: clickedButtonID
     }
     placedTile = null;
     chatMessage = null;
+    clickedButtonID = null;
     socket.emit('PLAYERPACKET', packet);
 }
 
@@ -197,6 +210,10 @@ socket.on('SERVERPACKET', function(data) {
     if(data.chat !== null) {
         renderChat(data.chat);
     }
+
+    $('#uraniumLabel').text('Uranium: ' + players[socketID].uranium);
+    $('#healthRegLabel').text('Health regen: ' + players[socketID].healthRegen);
+    $('#moveSpeedLabel').text('Move speed: ' + players[socketID].moveSpeed);
 });
 
 function drawGrapichs() {
@@ -251,10 +268,8 @@ function drawGrapichs() {
     bufferCTX.fillStyle = 'white';
     bufferCTX.fillRect(mousePos.x, mousePos.y, 5, 5);
 
-    /*INFO TEXT 
-    bufferCTX.font = "20px Arial";
-    bufferCTX.fillText("FPS:" + fps + " x: " + players[socketID].location.x + " y: " + players[socketID].location.y, 2, 20);
-    */
+    game.drawMiniMap(new U.Point(200, 200), players,);
+    bufferCTX = game.ctx;
 
     ctx.drawImage(bufferCanvas, 0, 0);
 }

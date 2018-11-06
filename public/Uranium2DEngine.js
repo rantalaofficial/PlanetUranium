@@ -14,6 +14,42 @@ class Point {
     }
 }
 
+//WORK IN PROGRESS
+class Game {
+
+    constructor(ctx, width, height, socketID, map, textures) {
+        this.ctx = ctx;
+        
+        this.width = width;
+        this.height = height;
+
+        this.socketID = socketID;
+
+        this.map = map;
+
+        this.textures = textures;
+    }
+
+    drawMiniMap(miniMapSize, players) {
+        let miniMapPos = new Point(this.width - miniMapSize.x, this.height - miniMapSize.y);
+
+        this.ctx.fillStyle = "rgba(50, 50, 50, 0.5)";
+        this.ctx.fillRect(miniMapPos.x, miniMapPos.y, miniMapSize.x, miniMapSize.y);
+
+        for(let id in players) {
+            if(id == this.socketID) {
+                this.ctx.fillStyle = 'white';
+            } else {
+                this.ctx.fillStyle = 'red';
+            }
+
+            let scaledLoc = new Point((players[id].location.x / (this.map.tileSize * this.map.width)) * miniMapSize.x + miniMapPos.x, (players[id].location.y / (this.map.tileSize * this.map.height)) * miniMapSize.y + miniMapPos.y)
+            this.ctx.fillRect(scaledLoc.x - 2, scaledLoc.y - 2, 4, 4);
+            console.log(miniMapSize.x);
+        }
+    }
+}
+
 class Texture {
     constructor(source, isOnTop, offset) {
         this.image = new Image();
@@ -74,4 +110,4 @@ function insideGameWindow(p) {
     return true;
 }
 
-export {Point, Texture, Player};
+export {Point, Game, Texture, Player};

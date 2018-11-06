@@ -30,7 +30,6 @@ if (err) throw err;
     console.log("Connected to DB");
 });
 
-//NETWORKING
 let updateRate = 80;
 setInterval(serverTick, 1000 / updateRate);
 
@@ -38,6 +37,7 @@ let players = {};
 
 let map = new U.Map(30, 100, 100);
 map.addTiles(3, 2);
+map.addTiles(4, 1);
 
 let chat = new U.Chat(300);
 chat.addMessage("SERVER", "SERVER STARTED :D", "red");
@@ -60,8 +60,7 @@ io.on('connection', function(socket) {
         }
         DBconnection.query("SELECT password FROM planeturanium.users WHERE username = '" + username + "';" , function(err, result) {
             if(result[0] && passwordHash === result[0].password) {
-                players[socket.id] = new U.Player(username, new U.Point(0, 0), 0.1, 6);
-                console.log(players[socket.id].health);
+                players[socket.id] = new U.Player(username, new U.Point(0, 0), 1, 5, 2000);
                 respawnPlayer(socket.id);
                 socket.emit('LOGGED', {
                     socketID: socket.id,
@@ -126,7 +125,7 @@ io.on('connection', function(socket) {
                 //TEST PLAYER HIT
                 let playerHitID = getPlayersInRadius(socket.id , players[socket.id].beamEnd, map.tileSize / 2);
                 if(playerHitID) {
-                    players[playerHitID].health -= 3;
+                    players[playerHitID].health -= 5;
                     if(players[playerHitID].health < 1) {
                         players[playerHitID].health = 100;
                         respawnPlayer(playerHitID);
@@ -150,31 +149,49 @@ io.on('connection', function(socket) {
         if(obgInsideMap(new U.Point(0, possibleMove.y), map.tileSize)) { 
             players[socket.id].location.y = possibleMove.y;
         }
-        //REMOVES ANY SOLID BLOCKS FROM PLAYERS LOCATION
-        let thisTile = getTileCoordinates(getPlayerCenter(socket.id));
+        //REMOVES ANY SOLID BLOCKS FROM PLAYERS LOCATION, IF TILE IS SHARD ADDS SHARD TO PLAYER
+        let thisTile = getTileCoordinates(getPlayerCenter(socket.id));  
+        if(map.tile[thisTile.x][thisTile.y] == 4) {
+            players[socket.id].uranium += 1;
+        }
         map.pushTileUpdate(thisTile, 0);    
         
-        //HEALTH REGEN
-        if(players[socket.id].health < 100) {
-            players[socket.id].health += players[socket.id].healthRegen;
-        }
-    
         //PLACES BLOCKS THAT PLAYER WANTS TO PLACE
         if(data.tile !== null && insideMap(data.tile)) {
             map.pushTileUpdate(data.tile, 1);
         }
+
+        //BUTTON CLICKED
+        if(data.clickedButtonID != null) {
+            if(data.clickedButtonID == 0 && players[socket.id].healthRegen > 0) {
+                players[socket.id].tryChangeStats(-1, 0);
+            } else if(data.clickedButtonID == 1 && players[socket.id].uranium > 0) {
+                players[socket.id].tryChangeStats(1, 0);
+            } else if(data.clickedButtonID == 2 && players[socket.id].moveSpeed > 1) {
+                players[socket.id].tryChangeStats(0, -1);
+            } else if(data.clickedButtonID == 3 && players[socket.id].uranium > 0) {
+                players[socket.id].tryChangeStats(0, 1);
+            }
+        }   
     });
 
 });
 
 function serverTick() {
+    //HEALTH REGEN
+    for(id in players) {
+        if(players[id].health < 100) {
+            players[id].health += players[id].healthRegen;
+        }
+    }
+    
+    //NETWORKING
     packet = {
         updatedTiles: map.updatedTiles,
         updatedTileTypes: map.updatedTileTypes,
         players: players,
         chat: null
     }
-    //IF CHAT HAS NEW MESSAGES ADDS THEM TO PACKET
     if(chat.chatUpdated) {
         packet.chat = chat.messages;
     }
