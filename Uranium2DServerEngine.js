@@ -9,17 +9,46 @@ class Point {
     }
 }
 class Player {
-    constructor(username, location, healthRegen, moveSpeed) {
+    constructor(username, uranium, healthRegen, moveSpeed) {
         this.username = username;
-        this.location = location;
 
         this.healthRegen = healthRegen;
         this.health = 100;
 
+        this.uranium = uranium;
+
         this.moveSpeed = moveSpeed;
 
+        this.location = new Point(0, 0);
         this.beamStart = null;
         this.beamEnd = null;
+    }
+
+    tryChangeStats(healthRegenChange, moveSpeedChange) {
+        let possibleHealthRegen = healthRegenChange + this.healthRegen;
+        let possibleMoveSpeed = moveSpeedChange + this.moveSpeed;
+
+        if(healthRegenChange > 0 && this.uranium - Math.pow(possibleHealthRegen, 2) >= 0) {
+            this.uranium -= Math.pow(possibleHealthRegen, 2);
+            this.healthRegen = possibleHealthRegen;
+        } else if(healthRegenChange < 0 && possibleHealthRegen >= 0) {
+            this.uranium += Math.pow(this.healthRegen, 2);
+            this.healthRegen = possibleHealthRegen;
+        }
+
+        if(moveSpeedChange > 0 && this.uranium - Math.pow(possibleMoveSpeed, 2) >= 0) {
+            this.uranium -= Math.pow(possibleMoveSpeed, 2);
+            this.moveSpeed = possibleMoveSpeed;
+        } else if(moveSpeedChange < 0 && possibleMoveSpeed > 0) {
+            this.uranium += Math.pow(this.moveSpeed, 2);
+            this.moveSpeed = possibleMoveSpeed;
+        }
+    }
+
+    respawnPlayer(map) {
+        this.health = 100;
+        this.location.x = Math.round(Math.random() * (map.width - 1) * map.tileSize);
+        this.location.y = Math.round(Math.random() * (map.height - 1) * map.tileSize);
     }
 }
 class Map {

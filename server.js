@@ -1,14 +1,14 @@
 const express = require('express');
 const socket = require('socket.io');
-const mysql = require('mysql');
 const crypto = require('crypto');
 const U = require('./Uranium2DServerEngine');
+const mongoose = require('mongoose');
 
 //APP SETUP
 let serverPort = 8080;
 let app = express();
 let server = app.listen(serverPort, function() {
-	console.log("Server started on port: " + serverPort)
+	console.log("Server started on port " + serverPort)
 });
 app.use(function(req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
@@ -18,17 +18,63 @@ app.use(function(req, res, next) {
 app.use(express.static('public'));
 let io = socket(server);
 
-//MYSQL DATABASE
-let DBconnection = mysql.createConnection({
-    host: "localhost",
-    user: "user",
-    password: "hFxKMZZF5yir5FpI",
-    database: "planeturanium"
-  });
-DBconnection.connect(function(err) {
-if (err) throw err;
-    console.log("Connected to DB");
+//DATABASE
+mongoose.connect('mongodb://localhost/planeturanium', {useNewUrlParser: true, useCreateIndex: true}, function (err) {
+   if (err) throw err;
+   console.log('Connected to database');
 });
+let userDataSchema = new mongoose.Schema({
+    username: {
+        type: String,
+        required: true,
+        unique: true,
+    },
+    password: {
+        type: String,
+        required: true
+    },
+    uranium: {
+        type: Number,
+        required: true
+    },
+    healthRegen: {
+        type: Number,
+        required: true
+    },
+    moveSpeed: {
+        type: Number,
+        required: true
+    }
+});
+let userData = mongoose.model('userData', userDataSchema);
+//RESET DB
+//userData.deleteMany({type: String}, function(err) {});
+//LOG REGISTERED PLAYERS
+userData.find(function(err, users) {
+    let usernameList = '';
+    for(let i in users) {
+        usernameList += users[i].username + ', '
+    }
+    console.log('Registered users: ' + usernameList);
+
+    //SHOW WHOLE DATABASE
+    console.log(users);
+});
+function savePlayerStats(id, deleteStatsFromMemory) {
+    if(players[id] === undefined) {
+        return;
+    }
+    userData.findOne({username: players[id].username}, function(err, user) {
+        user.uranium = players[id].uranium;
+        user.healthRegen = players[id].healthRegen;
+        user.moveSpeed = players[id].moveSpeed;
+        user.save();
+
+        if(deleteStatsFromMemory) {
+            delete players[id];
+        }
+    });
+}
 
 let updateRate = 80;
 setInterval(serverTick, 1000 / updateRate);
@@ -47,21 +93,24 @@ io.on('connection', function(socket) {
     //console.log('Socket connected', socket.id);
 
     socket.on('disconnect', function() {
-        delete players[socket.id];
-        //console.log('Socket disconnected', socket.id);
+        if(players[socket.id] === undefined) {
+            return;
+        }
+        //SAVES PLAYER STATS TO DATABASE BEFORE REMOVING THEM FROM SERVER MEMORY
+        savePlayerStats(socket.id, true);
     });
 
     socket.on('LOGIN', function(data) {
-        let username = data.username;
         let passwordHash = hash256(data.password);
 
-        if(!username || !passwordHash) {
+        if(!data.username || !passwordHash) {
             return;
         }
-        DBconnection.query("SELECT password FROM planeturanium.users WHERE username = '" + username + "';" , function(err, result) {
-            if(result[0] && passwordHash === result[0].password) {
-                players[socket.id] = new U.Player(username, new U.Point(0, 0), 1, 5, 2000);
-                respawnPlayer(socket.id);
+
+        userData.findOne({username: data.username}, function(err, user) {
+            if(user && user.password === passwordHash) {
+                players[socket.id] = new U.Player(data.username, user.uranium, user.healthRegen, user.moveSpeed);
+                players[socket.id].respawnPlayer(map);
                 socket.emit('LOGGED', {
                     socketID: socket.id,
                     map: map,
@@ -75,21 +124,40 @@ io.on('connection', function(socket) {
     });
 
     socket.on('REGISTER', function(data) {
-        let username = data.username;
         let passwordHash = hash256(data.password);
 
-        if(!onlyLetters(username) || username.length < 6 || username.length > 20 ) {
+        if(!onlyLetters(data.username) || data.username.length < 6 || data.username.length > 20 ) {
             socket.emit('REGISTERFAILED', 'Username can only contain letters and numbers and it must be between 6 and 20 characters long.')
             return;
         }
-        DBconnection.query("INSERT INTO planeturanium.users (`username`, `password`) VALUES ('" + data.username + "', '" + passwordHash + "');", function(err, result) {
-            if(err) {
-                socket.emit('REGISTERFAILED', 'That username is already in use.')
+
+        userData.findOne({username: data.username}, function(err, user) {
+            if(user) {
+                socket.emit('REGISTERFAILED', 'That username is already in use');
             } else {
-                socket.emit('REGISTERED', '');
-                console.log('REGISTERED NEW PLAYER', data.username);
+                //MAKES NEW USER
+                let newUser = new userData({
+                    username: data.username,
+                    password: passwordHash,
+                    uranium: 0,
+                    healthRegen: 1,
+                    moveSpeed: 5
+                });
+
+                newUser.save().then(function() {
+                    socket.emit('REGISTERED', '');
+                    console.log('Player ' + data.username + ' registered');
+                })
+                .catch(function(err) {
+                    socket.emit('REGISTERFAILED', err);
+                });
             }
         });
+    });
+
+    socket.on('SAVESTATS', function() {
+        savePlayerStats(socket.id, false);
+        socket.emit('SAVECONFIRMED', '');
     });
 
     socket.on('PLAYERPACKET', function(data) {  
@@ -126,9 +194,8 @@ io.on('connection', function(socket) {
                 let playerHitID = getPlayersInRadius(socket.id , players[socket.id].beamEnd, map.tileSize / 2);
                 if(playerHitID) {
                     players[playerHitID].health -= 5;
-                    if(players[playerHitID].health < 1) {
-                        players[playerHitID].health = 100;
-                        respawnPlayer(playerHitID);
+                    if(players[playerHitID].health <= 0) {
+                        players[playerHitID].respawnPlayer(map);
                     }
                     break;
                 }
@@ -200,11 +267,6 @@ function serverTick() {
     map.clearTileUpdates();
 
     io.sockets.emit('SERVERPACKET', packet);
-}
-
-function respawnPlayer(id) {
-    players[id].location.x = Math.round(Math.random() * (map.width - 1) * map.tileSize);
-    players[id].location.y = Math.round(Math.random() * (map.height - 1) * map.tileSize);
 }
 
 function getPlayersInRadius(self ,location, searchRadius) {

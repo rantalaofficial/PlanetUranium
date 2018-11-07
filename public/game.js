@@ -125,6 +125,14 @@ socket.on('LOGGED', function(data) {
     $('#guiBtn2').click(function() {clickedButtonID = 2;});
     $('#guiBtn3').click(function() {clickedButtonID = 3;});
 
+    $('#logoutBtn').click(function() {
+        document.cookie = '';
+        location.href = 'index.html';
+    });
+    $('#saveButton').click(function() {
+        socket.emit('SAVESTATS', '');
+    });
+
     //INIT GAME
     game = new U.Game(bufferCTX, 1200, 700, socketID, map, textures);
     map = data.map;
@@ -137,12 +145,16 @@ socket.on('LOGGED', function(data) {
     setInterval(loop, 1000 / targetFPS);
 });
 
+socket.on('disconnect', function() {
+    location.href = 'index.html';
+});
+
 socket.on('LOGINFAILED', function(data) {
     location.href = 'index.html';
 });
 
-socket.on('disconnect', function() {
-    location.href = 'index.html';
+socket.on('SAVECONFIRMED', function() {
+    alert('Save successful');
 });
 
 function loop() {

@@ -17,6 +17,7 @@ button {
     border: 2px solid white;
     border-radius: 2px;
     color: black;
+    height: 30px;
 }
 
 * {
@@ -96,9 +97,6 @@ h1 {
     margin-left: 2px;
     display: inline;
 }
-#topBar button {
-    height: 30px;
-}
 .downBtn {
     background-color: rgb(221, 103, 103);
     font-size: 18px;
@@ -138,7 +136,6 @@ h1 {
 #submitButton, #switchFormButton {
     margin: var(--margin);
     width: 150px;
-    height: 30px;
 }
 
 #passwordWarningText {
@@ -148,6 +145,10 @@ h1 {
 #loginInfoText {
     text-align: left;
     margin: 0px;
+}
+
+#sessionInfoSpan * {
+    margin: 4px;
 }
 
 .hide {
