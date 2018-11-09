@@ -45,7 +45,6 @@ class Game {
 
             let scaledLoc = new Point((players[id].location.x / (this.map.tileSize * this.map.width)) * miniMapSize.x + miniMapPos.x, (players[id].location.y / (this.map.tileSize * this.map.height)) * miniMapSize.y + miniMapPos.y)
             this.ctx.fillRect(scaledLoc.x - 2, scaledLoc.y - 2, 4, 4);
-            console.log(miniMapSize.x);
         }
     }
 }

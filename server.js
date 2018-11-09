@@ -23,61 +23,27 @@ mongoose.connect('mongodb://localhost/planeturanium', {useNewUrlParser: true, us
    if (err) throw err;
    console.log('Connected to database');
 });
-let userDataSchema = new mongoose.Schema({
-    username: {
-        type: String,
-        required: true,
-        unique: true,
-    },
-    password: {
-        type: String,
-        required: true
-    },
-    uranium: {
-        type: Number,
-        required: true
-    },
-    healthRegen: {
-        type: Number,
-        required: true
-    },
-    moveSpeed: {
-        type: Number,
-        required: true
-    }
+mongoose.connection.on('disconnected', function () {  
+    console.log('Connection lost to database'); 
+    chat.addMessage("SERVER", "Connection lost to database, shutting down in 5 seconds", "red");
+    setInterval(shutdown, 5000);
 });
-let userData = mongoose.model('userData', userDataSchema);
+  
+function shutdown() {
+    process.exit();
+}
+
+const userData = require('./userdata');
 //RESET DB
 //userData.deleteMany({type: String}, function(err) {});
-//LOG REGISTERED PLAYERS
+
 userData.find(function(err, users) {
     let usernameList = '';
     for(let i in users) {
         usernameList += users[i].username + ', '
     }
     console.log('Registered users: ' + usernameList);
-
-    //SHOW WHOLE DATABASE
-    console.log(users);
 });
-function savePlayerStats(id, deleteStatsFromMemory) {
-    if(players[id] === undefined) {
-        return;
-    }
-    userData.findOne({username: players[id].username}, function(err, user) {
-        user.uranium = players[id].uranium;
-        user.healthRegen = players[id].healthRegen;
-        user.moveSpeed = players[id].moveSpeed;
-        user.save();
-
-        if(deleteStatsFromMemory) {
-            delete players[id];
-        }
-    });
-}
-
-let updateRate = 80;
-setInterval(serverTick, 1000 / updateRate);
 
 let players = {};
 
@@ -86,11 +52,13 @@ map.addTiles(3, 2);
 map.addTiles(4, 1);
 
 let chat = new U.Chat(300);
-chat.addMessage("SERVER", "SERVER STARTED :D", "red");
+chat.addMessage("SERVER", "Server started successfully", "red");
 
+//TIMERS
+setInterval(serverTick, 1000 / 80);
+setInterval(databaseUpdater, 60000 * 5); //AUTOSAVES ALL PLAYERS AND UPDATES SCOREBOARDS EVERY 5 MINUTES
 
 io.on('connection', function(socket) {
-    //console.log('Socket connected', socket.id);
 
     socket.on('disconnect', function() {
         if(players[socket.id] === undefined) {
@@ -156,8 +124,9 @@ io.on('connection', function(socket) {
     });
 
     socket.on('SAVESTATS', function() {
-        savePlayerStats(socket.id, false);
-        socket.emit('SAVECONFIRMED', '');
+        savePlayerStats(socket.id, false).then(function(result) {
+            socket.emit('SAVESTATE', result);
+        });  
     });
 
     socket.on('PLAYERPACKET', function(data) {  
@@ -242,6 +211,17 @@ io.on('connection', function(socket) {
         }   
     });
 
+    socket.on('ADMINLOGIN', function(data) {
+        if(data === 'admin') {
+            let userinfos = [];
+            userData.find(function(err, users) {
+                for(let i in users) {
+                    userinfos.push([users[i].username, users[i].uranium, users[i].healthRegen, users[i].moveSpeed]);
+                }
+                socket.emit('ADMINLOGGED', userinfos); 
+            });
+        }
+    });
 });
 
 function serverTick() {
@@ -267,6 +247,44 @@ function serverTick() {
     map.clearTileUpdates();
 
     io.sockets.emit('SERVERPACKET', packet);
+}
+
+function databaseUpdater() {
+    let playersCount = Object.keys(players).length;
+    let playersSaved = 0;
+    for(id in players) {
+        savePlayerStats(id, false).then(function(result) {
+            if(result) {
+                playersSaved++;
+            }
+            if(playersSaved >= playersCount) {
+                chat.addMessage("SERVER", "All " + playersSaved + " players autosaved", "red");
+            }
+        });
+    }
+}
+
+function savePlayerStats(id, deleteStatsFromMemory) {
+    return new Promise(function(resolve) {
+        if(players[id] === undefined) {
+            resolve(false);
+        }
+        userData.findOne({username: players[id].username}, function(err, user) {
+            if(err) {
+                resolve(false);
+            } else {
+                user.uranium = players[id].uranium;
+                user.healthRegen = players[id].healthRegen;
+                user.moveSpeed = players[id].moveSpeed;
+                user.save();
+
+                if(deleteStatsFromMemory) {
+                    delete players[id];
+                }
+                resolve(true);
+            }
+        });
+    });
 }
 
 function getPlayersInRadius(self ,location, searchRadius) {

@@ -153,8 +153,12 @@ socket.on('LOGINFAILED', function(data) {
     location.href = 'index.html';
 });
 
-socket.on('SAVECONFIRMED', function() {
-    alert('Save successful');
+socket.on('SAVESTATE', function(state) {
+    if(state) {
+        alert('Saved');
+    } else {
+        alert('Save failed, try again');
+    }
 });
 
 function loop() {
