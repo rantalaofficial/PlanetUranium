@@ -124,6 +124,7 @@ socket.on('LOGGED', function(data) {
     $('#guiBtn1').click(function() {clickedButtonID = 1;});
     $('#guiBtn2').click(function() {clickedButtonID = 2;});
     $('#guiBtn3').click(function() {clickedButtonID = 3;});
+    $('#RichestPlayersBtn').click(function() {clickedButtonID = 4;});
 
     $('#logoutBtn').click(function() {
         document.cookie = '';
@@ -147,17 +148,29 @@ socket.on('LOGGED', function(data) {
 
 socket.on('disconnect', function() {
     location.href = 'index.html';
+    showAlert('Connection lost');
 });
 
 socket.on('LOGINFAILED', function(data) {
     location.href = 'index.html';
 });
 
-socket.on('SAVESTATE', function(state) {
-    if(state) {
-        alert('Saved');
-    } else {
-        alert('Save failed, try again');
+socket.on('ALERT', function(text) {
+    showAlert('Server', text);
+});
+
+socket.on('SCOREBOARD', function(data) {
+    let rank = 0;
+    let scoreboardText = "<table>"
+    for(let i in data.scoreboard) {
+        rank += 1;
+        let user = data.scoreboard[i]
+        scoreboardText += "<tr><td>" + rank + ". " + user[0] + "</td><td>" + user[1] + "</td><br>";
+    }
+    scoreboardText += "</table>"
+
+    if(data.type === 0) {
+        showAlert('Richest Players', scoreboardText);
     }
 });
 
@@ -288,6 +301,16 @@ function drawGrapichs() {
     bufferCTX = game.ctx;
 
     ctx.drawImage(bufferCanvas, 0, 0);
+}
+
+function showAlert(title, text) {
+    //CLOSES OLD ALERTS
+    $(".ui-dialog-content").dialog('close');
+
+    $('<div id="alertBox"></div>').html(text).dialog({
+        title: title,
+        resizable: false,
+    });
 }
 
 function renderChat(messages) {

@@ -21,6 +21,10 @@ let userDataSchema = new mongoose.Schema({
     moveSpeed: {
         type: Number,
         required: true
+    },
+    kills: {
+        type: Number,
+        required: true
     }
 });
 

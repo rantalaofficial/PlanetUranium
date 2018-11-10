@@ -108,6 +108,22 @@ h1 {
     width: 30px;
 }
 
+.ui-dialog .ui-dialog-titlebar-close {
+    position: absolute;
+    right: 5px;
+    top: 5px;
+}
+.ui-dialog-titlebar {
+    background-color: white;
+    color: black;
+    padding: 10px;
+}
+#alertBox {
+    background: gray;
+    color: black;
+    padding: 10px;
+}
+
 /* LOGIN AND REGISTER */
 #loginForm {
     min-width: 300px;

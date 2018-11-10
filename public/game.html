@@ -4,6 +4,7 @@
 	<head>
 		<title>PlanetUranium</title>
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
 		<script src="/socket.io/socket.io.js"></script>
 		<link href="styling.css" type="text/css" rel="stylesheet" />
         <link href='https://fonts.googleapis.com/css?family=ABeeZee' rel='stylesheet'>
@@ -31,7 +32,6 @@
 		
 		<div id="topBar">
 			<span>
-				
 				<img src="recources/4.png" style="margin-left: -5px; margin-bottom: -8px;">
 				<p id="uraniumLabel"></p>
 
@@ -43,15 +43,16 @@
 				<button id="guiBtn2" class="downBtn">-</button>
 				<button id="guiBtn3" class="upBtn">+</button>
 				
-				<button>Online players</button>
-				<button>Richest players</button>
-				<button>Top killers</button>
+				<button id="onlinePlayersBtn">Online players</button>
+				<button id="RichestPlayersBtn">Richest players</button>
+				<button id="topKillersBtn">Top killers</button>
 			</span>
 		</div>
 
 		<canvas id="bufferCanvas"></canvas>
+		
 	</div>
-
+	
 	<script src="/connection.js"></script>
 	<script src="/game.js" type="module"></script>
 

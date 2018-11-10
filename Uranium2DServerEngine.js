@@ -9,15 +9,13 @@ class Point {
     }
 }
 class Player {
-    constructor(username, uranium, healthRegen, moveSpeed) {
+    constructor(username, uranium, healthRegen, moveSpeed, kills) {
         this.username = username;
-
+        this.uranium = uranium;
         this.healthRegen = healthRegen;
         this.health = 100;
-
-        this.uranium = uranium;
-
         this.moveSpeed = moveSpeed;
+        this.kills = kills;
 
         this.location = new Point(0, 0);
         this.beamStart = null;

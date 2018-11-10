@@ -24,14 +24,9 @@ mongoose.connect('mongodb://localhost/planeturanium', {useNewUrlParser: true, us
    console.log('Connected to database');
 });
 mongoose.connection.on('disconnected', function () {  
-    console.log('Connection lost to database'); 
-    chat.addMessage("SERVER", "Connection lost to database, shutting down in 5 seconds", "red");
-    setInterval(shutdown, 5000);
+    console.log('Connection lost to database, shutting down'); 
+    shutdownServer('connection lost to database', 5);
 });
-  
-function shutdown() {
-    process.exit();
-}
 
 const userData = require('./userdata');
 //RESET DB
@@ -46,6 +41,7 @@ userData.find(function(err, users) {
 });
 
 let players = {};
+let scoreboards = {};
 
 let map = new U.Map(30, 100, 100);
 map.addTiles(3, 2);
@@ -56,7 +52,8 @@ chat.addMessage("SERVER", "Server started successfully", "red");
 
 //TIMERS
 setInterval(serverTick, 1000 / 80);
-setInterval(databaseUpdater, 60000 * 5); //AUTOSAVES ALL PLAYERS AND UPDATES SCOREBOARDS EVERY 5 MINUTES
+setInterval(databaseUpdater, 60000 * 3); //AUTOSAVES ALL PLAYERS AND UPDATES SCOREBOARDS EVERY 3 MINUTES
+databaseUpdater();
 
 io.on('connection', function(socket) {
 
@@ -76,8 +73,12 @@ io.on('connection', function(socket) {
         }
 
         userData.findOne({username: data.username}, function(err, user) {
+            if(err) {
+                socket.emit('LOGINFAILED', 'Wrong username or password.');
+                return;
+            }
             if(user && user.password === passwordHash) {
-                players[socket.id] = new U.Player(data.username, user.uranium, user.healthRegen, user.moveSpeed);
+                players[socket.id] = new U.Player(data.username, user.uranium, user.healthRegen, user.moveSpeed, user.kills);
                 players[socket.id].respawnPlayer(map);
                 socket.emit('LOGGED', {
                     socketID: socket.id,
@@ -86,7 +87,7 @@ io.on('connection', function(socket) {
                     chat: chat.messages
                 });
             } else {
-                socket.emit('LOGINFAILED', 'Wrong username or password.')
+                socket.emit('LOGINFAILED', 'Wrong username or password.');
             }
         });
     });
@@ -109,7 +110,8 @@ io.on('connection', function(socket) {
                     password: passwordHash,
                     uranium: 0,
                     healthRegen: 1,
-                    moveSpeed: 5
+                    moveSpeed: 5,
+                    kills: 0
                 });
 
                 newUser.save().then(function() {
@@ -117,6 +119,7 @@ io.on('connection', function(socket) {
                     console.log('Player ' + data.username + ' registered');
                 })
                 .catch(function(err) {
+                    //console.log(err);
                     socket.emit('REGISTERFAILED', err);
                 });
             }
@@ -125,7 +128,11 @@ io.on('connection', function(socket) {
 
     socket.on('SAVESTATS', function() {
         savePlayerStats(socket.id, false).then(function(result) {
-            socket.emit('SAVESTATE', result);
+            if(result) {
+                socket.emit('ALERT', 'Save successful');
+            } else {
+                socket.emit('ALERT', 'Saving failed, try again');
+            }
         });  
     });
 
@@ -164,6 +171,7 @@ io.on('connection', function(socket) {
                 if(playerHitID) {
                     players[playerHitID].health -= 5;
                     if(players[playerHitID].health <= 0) {
+                        players[socket.id].kills += 1;
                         players[playerHitID].respawnPlayer(map);
                     }
                     break;
@@ -207,6 +215,11 @@ io.on('connection', function(socket) {
                 players[socket.id].tryChangeStats(0, -1);
             } else if(data.clickedButtonID == 3 && players[socket.id].uranium > 0) {
                 players[socket.id].tryChangeStats(0, 1);
+            } else if(data.clickedButtonID == 4) {
+                socket.emit('SCOREBOARD', {
+                    type: 0,
+                    scoreboard: scoreboards.uranium
+                });
             }
         }   
     });
@@ -216,7 +229,7 @@ io.on('connection', function(socket) {
             let userinfos = [];
             userData.find(function(err, users) {
                 for(let i in users) {
-                    userinfos.push([users[i].username, users[i].uranium, users[i].healthRegen, users[i].moveSpeed]);
+                    userinfos.push([users[i].username, users[i].uranium, users[i].healthRegen, users[i].moveSpeed, users[i].kills]);
                 }
                 socket.emit('ADMINLOGGED', userinfos); 
             });
@@ -256,12 +269,28 @@ function databaseUpdater() {
         savePlayerStats(id, false).then(function(result) {
             if(result) {
                 playersSaved++;
+            } else {
+                chat.addMessage("SERVER", "Failed to autosave " + players[id].username, "red");
             }
             if(playersSaved >= playersCount) {
                 chat.addMessage("SERVER", "All " + playersSaved + " players autosaved", "red");
             }
         });
     }
+
+    //UPDATES SCOREBOARDS AFTER 10 SECONDS
+    setTimeout(function() {
+        userData.find(function(err, users) {
+            if(err) {
+                console.log(err);
+            } else {
+                scoreboards.uranium = [];
+                for(let i in users) {
+                    scoreboards.uranium.push([users[i].username, users[i].uranium]);
+                }
+            }
+        }).sort({uranium: -1}).limit(10);
+    }, 10000);
 }
 
 function savePlayerStats(id, deleteStatsFromMemory) {
@@ -276,6 +305,7 @@ function savePlayerStats(id, deleteStatsFromMemory) {
                 user.uranium = players[id].uranium;
                 user.healthRegen = players[id].healthRegen;
                 user.moveSpeed = players[id].moveSpeed;
+                user.kills = players[id].kills;
                 user.save();
 
                 if(deleteStatsFromMemory) {
@@ -285,6 +315,13 @@ function savePlayerStats(id, deleteStatsFromMemory) {
             }
         });
     });
+}
+
+function shutdownServer(reason, seconds) {
+    io.sockets.emit('ALERT', 'Server shutting down in ' + seconds + ' seconds becouse ' + reason);
+    setTimeout(function() {
+        process.exit();
+    }, 1000 * seconds)
 }
 
 function getPlayersInRadius(self ,location, searchRadius) {
