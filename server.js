@@ -46,6 +46,7 @@ let scoreboards = {};
 let map = new U.Map(30, 100, 100);
 map.addTiles(3, 2);
 map.addTiles(4, 1);
+map.addSign('Welcome to the server', new U.Point(10, 10));
 
 let chat = new U.Chat(300);
 chat.addMessage("SERVER", "Server started successfully", "red");
@@ -70,6 +71,14 @@ io.on('connection', function(socket) {
 
         if(!data.username || !passwordHash) {
             return;
+        }
+
+        //CHECKS THAT USERNAME IS NOT ALREADY INGAME
+        for(let id in players) {
+            if(players[id].username === data.username) {
+                socket.emit('LOGINFAILED', 'You are already logged in.');
+                return;
+            }
         }
 
         userData.findOne({username: data.username}, function(err, user) {
@@ -129,9 +138,9 @@ io.on('connection', function(socket) {
     socket.on('SAVESTATS', function() {
         savePlayerStats(socket.id, false).then(function(result) {
             if(result) {
-                socket.emit('ALERT', 'Save successful');
+                socket.emit('ALERT', {title: 'Server', text: 'Save successful'});
             } else {
-                socket.emit('ALERT', 'Saving failed, try again');
+                socket.emit('ALERT', {title: 'Server', text: 'Saving failed, try again'});
             }
         });  
     });
@@ -193,15 +202,24 @@ io.on('connection', function(socket) {
         if(obgInsideMap(new U.Point(0, possibleMove.y), map.tileSize)) { 
             players[socket.id].location.y = possibleMove.y;
         }
-        //REMOVES ANY SOLID BLOCKS FROM PLAYERS LOCATION, IF TILE IS SHARD ADDS SHARD TO PLAYER
+        //REMOVES ANY SOLID BLOCKS FROM PLAYERS LOCATION, IF TILE IS SHARD ADDS SHARD TO PLAYER, IF TILE IS SIGN SENDS ALERT WITH SIGN TEXT
         let thisTile = getTileCoordinates(getPlayerCenter(socket.id));  
-        if(map.tile[thisTile.x][thisTile.y] == 4) {
-            players[socket.id].uranium += 1;
+        if(map.tile[thisTile.x][thisTile.y] == 5) {
+            //SHOWS SIGN TEXT ONLY ONCE
+            if(!players[socket.id].signShown) {
+                players[socket.id].signShown = true;
+                socket.emit('ALERT', {title: 'Sign', text: map.signText[thisTile.x][thisTile.y]});
+            }
+        } else {
+            players[socket.id].signShown = false;
+            if(map.tile[thisTile.x][thisTile.y] == 4) {
+                players[socket.id].uranium += 1;
+            }
+            map.pushTileUpdate(thisTile, 0);   
         }
-        map.pushTileUpdate(thisTile, 0);    
         
-        //PLACES BLOCKS THAT PLAYER WANTS TO PLACE
-        if(data.tile !== null && insideMap(data.tile)) {
+        //PLACES BLOCKS IF NOT SIGN
+        if(data.tile !== null && insideMap(data.tile) && map.tile[data.tile.x][data.tile.y] != 5) {
             map.pushTileUpdate(data.tile, 1);
         }
 
@@ -219,6 +237,11 @@ io.on('connection', function(socket) {
                 socket.emit('SCOREBOARD', {
                     type: 0,
                     scoreboard: scoreboards.uranium
+                });
+            } else if(data.clickedButtonID == 5) {
+                socket.emit('SCOREBOARD', {
+                    type: 1,
+                    scoreboard: scoreboards.kills
                 });
             }
         }   
@@ -280,17 +303,38 @@ function databaseUpdater() {
 
     //UPDATES SCOREBOARDS AFTER 10 SECONDS
     setTimeout(function() {
-        userData.find(function(err, users) {
-            if(err) {
-                console.log(err);
-            } else {
+        //URANIUM
+        getTopUsers({uranium: -1}, 10).then(function(users) {
+            if(users) {
                 scoreboards.uranium = [];
                 for(let i in users) {
                     scoreboards.uranium.push([users[i].username, users[i].uranium]);
                 }
             }
-        }).sort({uranium: -1}).limit(10);
+        });
+
+        //KILLS
+        getTopUsers({kills: -1}, 10).then(function(users) {
+            if(users) {
+                scoreboards.kills = [];
+                for(let i in users) {
+                    scoreboards.kills.push([users[i].username, users[i].kills]);
+                }
+            }
+        });
     }, 10000);
+}
+
+function getTopUsers(sort, limit) {
+    return new Promise(function(resolve) {
+        userData.find(function(err, users) {
+            if(err) {
+                resolve(false);
+            } else {
+                resolve(users);
+            }
+        }).sort(sort).limit(limit);
+    });
 }
 
 function savePlayerStats(id, deleteStatsFromMemory) {
@@ -325,7 +369,7 @@ function shutdownServer(reason, seconds) {
 }
 
 function getPlayersInRadius(self ,location, searchRadius) {
-    for(id in players) {
+    for(let id in players) {
         if(id === self) {
             continue;
         }

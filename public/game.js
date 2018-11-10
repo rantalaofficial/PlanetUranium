@@ -21,6 +21,7 @@ textures.push(new U.Texture('/recources/1.png', true, new U.Point(0, -16)));
 textures.push(new U.Texture('/recources/2.png', false, new U.Point(0, 0)));
 textures.push(new U.Texture('/recources/3.png', true, new U.Point(-30, -60)));
 textures.push(new U.Texture('/recources/4.png', true, new U.Point(0, 0)));
+textures.push(new U.Texture('/recources/5.png', true, new U.Point(-10, -40)));
 
 //WORK IN PROGRESS
 let gameWidth = 1200;
@@ -124,7 +125,16 @@ socket.on('LOGGED', function(data) {
     $('#guiBtn1').click(function() {clickedButtonID = 1;});
     $('#guiBtn2').click(function() {clickedButtonID = 2;});
     $('#guiBtn3').click(function() {clickedButtonID = 3;});
-    $('#RichestPlayersBtn').click(function() {clickedButtonID = 4;});
+    $('#richestPlayersBtn').click(function() {clickedButtonID = 4;});
+    $('#topKillersBtn').click(function() {clickedButtonID = 5;});
+    $('#onlinePlayersBtn').click(function() {
+        let onlinePlayersText = "<table style='width: 100%'><tr><th>Username</th></tr>";
+        for(let id in players) {
+            onlinePlayersText += "<tr><td>" + players[id].username + "</td></td>";
+        }
+        onlinePlayersText += "</table>"
+        showAlert('Online players', onlinePlayersText);
+    });
 
     $('#logoutBtn').click(function() {
         document.cookie = '';
@@ -148,33 +158,45 @@ socket.on('LOGGED', function(data) {
 
 socket.on('disconnect', function() {
     location.href = 'index.html';
-    showAlert('Connection lost');
+    showAlert('Client', 'Connection lost');
 });
 
 socket.on('LOGINFAILED', function(data) {
     location.href = 'index.html';
 });
 
-socket.on('ALERT', function(text) {
-    showAlert('Server', text);
+socket.on('ALERT', function(data) {
+    showAlert(data.title, data.text);
 });
 
 socket.on('SCOREBOARD', function(data) {
+    let title = "";
+    let scoreboardText = "";
+    if(data.type === 0) {
+        title = 'Richest players';
+        scoreboardText = "<table style='width: 100%'><tr><th>Username</th><th>Uranium</th></tr>";
+    } else if(data.type === 1) {
+        title = 'Top killers';
+        scoreboardText = "<table style='width: 100%'><tr><th>Username</th><th>Kills</th></tr>";
+    } else {
+        return;
+    }
+
     let rank = 0;
-    let scoreboardText = "<table>"
     for(let i in data.scoreboard) {
         rank += 1;
         let user = data.scoreboard[i]
-        scoreboardText += "<tr><td>" + rank + ". " + user[0] + "</td><td>" + user[1] + "</td><br>";
+        scoreboardText += "<tr><td>" + rank + ". " + user[0] + "</td><td>" + user[1] + "</td></td>";
     }
     scoreboardText += "</table>"
 
-    if(data.type === 0) {
-        showAlert('Richest Players', scoreboardText);
-    }
+    showAlert(title, scoreboardText);
 });
 
 function loop() {
+    //REMOVES FOCUS FROM ANY BUTTONS BECOUSE THEY MIGHT GET ACCIDENLTY PRESSED BY KEABOARD
+    $('button').blur();
+
     //CHAT
     if(keys[67]) {
         chatShown = true;
@@ -308,8 +330,7 @@ function showAlert(title, text) {
     $(".ui-dialog-content").dialog('close');
 
     $('<div id="alertBox"></div>').html(text).dialog({
-        title: title,
-        resizable: false,
+        title: title
     });
 }
 

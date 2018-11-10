@@ -20,6 +20,7 @@ class Player {
         this.location = new Point(0, 0);
         this.beamStart = null;
         this.beamEnd = null;
+        this.signShown = false;
     }
 
     tryChangeStats(healthRegenChange, moveSpeedChange) {
@@ -65,6 +66,11 @@ class Map {
             }
         }
 
+        this.signText = [];
+        for(let i = 0; i <= width; i++) {
+            this.signText[i] = [];
+        }
+
         this.updatedTiles = [];
         this.updatedTileTypes = [];
     }
@@ -77,6 +83,11 @@ class Map {
                 }
             }
         }
+    }
+
+    addSign(text, loc) {
+        this.tile[loc.x][loc.y] = 5;
+        this.signText[loc.x][loc.y] = text;
     }
 
     pushTileUpdate(loc, type) {
