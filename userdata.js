@@ -22,6 +22,10 @@ let userDataSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    beamLenght: {
+        type: Number,
+        required: true
+    },
     kills: {
         type: Number,
         required: true

@@ -30,12 +30,18 @@ class Game {
         this.textures = textures;
     }
 
-    drawMiniMap(miniMapSize, players) {
+    drawMiniMap(miniMapSize, players, signs) {
         let miniMapPos = new Point(this.width - miniMapSize.x, this.height - miniMapSize.y);
 
-        this.ctx.fillStyle = "rgba(50, 50, 50, 0.5)";
+        this.ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
         this.ctx.fillRect(miniMapPos.x, miniMapPos.y, miniMapSize.x, miniMapSize.y);
-
+        
+        this.ctx.beginPath();
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = 'white';
+        this.ctx.rect(miniMapPos.x - 2, miniMapPos.y - 2, miniMapSize.x * 2, miniMapSize.y * 2);
+        this.ctx.stroke(); 
+        //PLAYERS
         for(let id in players) {
             if(id == this.socketID) {
                 this.ctx.fillStyle = 'white';
@@ -43,7 +49,13 @@ class Game {
                 this.ctx.fillStyle = 'red';
             }
 
-            let scaledLoc = new Point((players[id].location.x / (this.map.tileSize * this.map.width)) * miniMapSize.x + miniMapPos.x, (players[id].location.y / (this.map.tileSize * this.map.height)) * miniMapSize.y + miniMapPos.y)
+            let scaledLoc = new Point((players[id].location.x / (this.map.tileSize * this.map.width)) * miniMapSize.x + miniMapPos.x, (players[id].location.y / (this.map.tileSize * this.map.height)) * miniMapSize.y + miniMapPos.y);
+            this.ctx.fillRect(scaledLoc.x - 2, scaledLoc.y - 2, 4, 4);
+        }
+        //SIGNS
+        for(let i in signs) {
+            this.ctx.fillStyle = '#42f456';
+            let scaledLoc = new Point(signs[i].x * (miniMapSize.x / this.map.width) + miniMapPos.x, signs[i].y * (miniMapSize.y / this.map.height) + miniMapPos.y);
             this.ctx.fillRect(scaledLoc.x - 2, scaledLoc.y - 2, 4, 4);
         }
     }

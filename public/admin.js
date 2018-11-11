@@ -14,7 +14,7 @@ socket.on('ADMINLOGGED', function(users) {
     $('#databaseTable td').remove();
     for(let i in users) {
         let user = users[i];
-        $('#databaseTable').append('<tr><td>' + user[0] + '</td><td>' + user[1] + ' </td><td>' + user[2] + '</td><td>' + user[3] + '</td><td>' + user[4] + '</td></tr>');
+        $('#databaseTable').append('<tr><td>' + user[0] + '</td><td>' + user[1] + ' </td><td>' + user[2] + '</td><td>' + user[3] + '</td><td>' + user[4] + '</td><td>' + user[5] + '</td></tr>');
     }
     $('#databaseTable').show();
 });

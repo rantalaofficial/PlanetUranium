@@ -9,12 +9,13 @@ class Point {
     }
 }
 class Player {
-    constructor(username, uranium, healthRegen, moveSpeed, kills) {
+    constructor(username, uranium, healthRegen, moveSpeed, beamLenght, kills) {
         this.username = username;
         this.uranium = uranium;
         this.healthRegen = healthRegen;
         this.health = 100;
         this.moveSpeed = moveSpeed;
+        this.beamLenght = beamLenght
         this.kills = kills;
 
         this.location = new Point(0, 0);
@@ -23,9 +24,10 @@ class Player {
         this.signShown = false;
     }
 
-    tryChangeStats(healthRegenChange, moveSpeedChange) {
+    tryChangeStats(healthRegenChange, moveSpeedChange, beamLenghtChange) {
         let possibleHealthRegen = healthRegenChange + this.healthRegen;
         let possibleMoveSpeed = moveSpeedChange + this.moveSpeed;
+        let possibleBeamLenght = beamLenghtChange + this.beamLenght;
 
         if(healthRegenChange > 0 && this.uranium - Math.pow(possibleHealthRegen, 2) >= 0) {
             this.uranium -= Math.pow(possibleHealthRegen, 2);
@@ -42,12 +44,20 @@ class Player {
             this.uranium += Math.pow(this.moveSpeed, 2);
             this.moveSpeed = possibleMoveSpeed;
         }
+
+        if(beamLenghtChange > 0 && this.uranium - Math.pow(possibleBeamLenght, 2) >= 0) {
+            this.uranium -= Math.pow(possibleBeamLenght, 2);
+            this.beamLenght = possibleBeamLenght;
+        } else if(beamLenghtChange < 0 && possibleBeamLenght >= 3) {
+            this.uranium += Math.pow(this.beamLenght, 2);
+            this.beamLenght = possibleBeamLenght;
+        }
     }
 
     respawnPlayer(map) {
         this.health = 100;
-        this.location.x = Math.round(Math.random() * (map.width - 1) * map.tileSize);
-        this.location.y = Math.round(Math.random() * (map.height - 1) * map.tileSize);
+        this.location.x = Math.round(Math.random() * map.tileSize * 14);
+        this.location.y = Math.round(Math.random() * map.tileSize * 14);
     }
 }
 class Map {
@@ -57,12 +67,15 @@ class Map {
         this.height = height;
 
         this.tile = [];
+        this.safeZone = []
         for(let i = 0; i <= width; i++) {
             this.tile[i] = [];
+            this.safeZone[i] = []
         }
         for(let y = 0; y < width; y++) {
             for(let x = 0; x < height; x++) {
                 this.tile[x][y] = 0;
+                this.safeZone[x][y] = false;
             }
         }
 
@@ -91,8 +104,8 @@ class Map {
     }
 
     pushTileUpdate(loc, type) {
-        //CHECKS THAT TILE NOT SAME
-        if(this.tile[loc.x][loc.y] !== type) {
+        //CHECKS THAT TILE NOT SAME AND ALSO THAT IT ISN'T SAFE ZONE
+        if(this.insideMap(loc, this.map) && this.tile[loc.x][loc.y] !== type && !this.safeZone[loc.x][loc.y]) {
             this.updatedTiles.push(loc);
             this.updatedTileTypes.push(type);
             this.tile[loc.x][loc.y] = type;
@@ -102,6 +115,22 @@ class Map {
     clearTileUpdates() {
         this.updatedTiles = [];
         this.updatedTileTypes = [];
+    }
+
+    setSafeZone(value, topLeft, bottomRight) {
+        for(let y = topLeft.y; y < bottomRight.y; y++) {
+            for(let x = topLeft.x; x < bottomRight.x; x++) {
+                this.safeZone[x][y] = value;
+                this.tile[x][y] = 0;
+            }
+        }
+    }
+
+    insideMap(p) {
+        if(p.x >= 0 && p.x <= this.width && p.y >= 0 && p.y <= this.height) {
+            return true;
+        }
+        return false;
     }
 }
 

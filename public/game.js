@@ -17,7 +17,7 @@ let bufferCTX;
 //TEXTURES/ TILES
 let textures = [];
 textures.push(new U.Texture('/recources/0.png', false, new U.Point(0, 0)));
-textures.push(new U.Texture('/recources/1.png', true, new U.Point(0, -16)));
+textures.push(new U.Texture('/recources/1.png', true, new U.Point(0, -11)));
 textures.push(new U.Texture('/recources/2.png', false, new U.Point(0, 0)));
 textures.push(new U.Texture('/recources/3.png', true, new U.Point(-30, -60)));
 textures.push(new U.Texture('/recources/4.png', true, new U.Point(0, 0)));
@@ -125,8 +125,10 @@ socket.on('LOGGED', function(data) {
     $('#guiBtn1').click(function() {clickedButtonID = 1;});
     $('#guiBtn2').click(function() {clickedButtonID = 2;});
     $('#guiBtn3').click(function() {clickedButtonID = 3;});
-    $('#richestPlayersBtn').click(function() {clickedButtonID = 4;});
-    $('#topKillersBtn').click(function() {clickedButtonID = 5;});
+    $('#guiBtn4').click(function() {clickedButtonID = 4;});
+    $('#guiBtn5').click(function() {clickedButtonID = 5;});
+    $('#richestPlayersBtn').click(function() {clickedButtonID = 6;});
+    $('#topKillersBtn').click(function() {clickedButtonID = 7;});
     $('#onlinePlayersBtn').click(function() {
         let onlinePlayersText = "<table style='width: 100%'><tr><th>Username</th></tr>";
         for(let id in players) {
@@ -207,11 +209,14 @@ function loop() {
         $('#chatContainer').css('pointer-events', 'all');
     } else if(keys[27]) {
         chatShown = false;
+        $('#chatMessageBox').val('');
         $('#chatMessageBox').blur();
         $('#chatMessageBox').attr("placeholder", "Press C to chat");
 
         $('#chatContainer').css('opacity', '0.6');
         $('#chatContainer').css('pointer-events', 'none');
+        //CLOSES ANY OPEN ALERT BOXES
+        $(".ui-dialog-content").dialog('close');
     }
 
     //GAME CONTROLS, CHECK ONLY WHEN CHAT NOT SHOWN
@@ -262,9 +267,10 @@ socket.on('SERVERPACKET', function(data) {
         renderChat(data.chat);
     }
 
-    $('#uraniumLabel').text('Uranium: ' + players[socketID].uranium);
-    $('#healthRegLabel').text('Health regen: ' + players[socketID].healthRegen);
-    $('#moveSpeedLabel').text('Move speed: ' + players[socketID].moveSpeed);
+    $('#uraniumLabel').text('Uranium: ' + zeroFill(players[socketID].uranium));
+    $('#healthRegLabel').text('Health regen: ' + zeroFill(players[socketID].healthRegen));
+    $('#moveSpeedLabel').text('Move speed: ' + zeroFill(players[socketID].moveSpeed));
+    $('#beamLenghtLabel').text('Beam lenght: ' + zeroFill(players[socketID].beamLenght));
 });
 
 function drawGrapichs() {
@@ -277,17 +283,22 @@ function drawGrapichs() {
         bufferCTX.fillRect(stars[i].x, stars[i].y, starSize, starSize);
     }
     //TILES, DRAWS ON TOP TILES LAST
+    let signs = [];
     let onTopTiles = [];
     for(let y = 0; y < map.height; y++) {
         for(let x = 0; x < map.width; x++) {
             let absolutePos = getTilePosition(new U.Point(x, y));
+            let tileType = map.tile[x][y];
+
+            if(tileType == 5) {
+                signs.push(new U.Point(x, y));
+            }
 
             //IF OUTSIDE GAME SKIPS TO NEXT TILE
             if(!insideGameWindow(absolutePos)) {
                 continue;
             }
 
-            let tileType = map.tile[x][y];
             if(textures[tileType].isOnTop) {
                 bufferCTX.drawImage(textures[0].image, absolutePos.x + textures[0].offset.x, absolutePos.y + textures[0].offset.y);
                 onTopTiles.push(new U.Point(x, y));
@@ -305,7 +316,7 @@ function drawGrapichs() {
         bufferCTX = U.Player.drawPlayer(bufferCTX, textures[2].image, players[id], players[socketID].location);
     }  
 
-    //DRAWS BIG TILES
+    //DRAWS ONTOP TILES
     if(onTopTiles.length > 0) {
         for(let i = 0; i < onTopTiles.length; i++) {
             let loc = onTopTiles[i];
@@ -319,7 +330,7 @@ function drawGrapichs() {
     bufferCTX.fillStyle = 'white';
     bufferCTX.fillRect(mousePos.x, mousePos.y, 5, 5);
 
-    game.drawMiniMap(new U.Point(200, 200), players,);
+    game.drawMiniMap(new U.Point(200, 200), players, signs);
     bufferCTX = game.ctx;
 
     ctx.drawImage(bufferCanvas, 0, 0);
@@ -329,7 +340,7 @@ function showAlert(title, text) {
     //CLOSES OLD ALERTS
     $(".ui-dialog-content").dialog('close');
 
-    $('<div id="alertBox"></div>').html(text).dialog({
+    $('<div id="alertBox"></div>').html(text + '<p>Press Esc to close</p>').dialog({
         title: title
     });
 }
@@ -381,6 +392,15 @@ function getTileCoordinates(p) {
         }
     }
     return false;
+}
+
+function zeroFill(number) {
+    let width = 3;
+    width -= number.toString().length;
+    if (width > 0) {
+        return new Array( width + (/\./.test( number ) ? 2 : 1) ).join( '0' ) + number;
+    }
+    return number + "";
 }
 
 function secTimer() {

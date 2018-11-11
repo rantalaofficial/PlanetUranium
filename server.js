@@ -36,6 +36,8 @@ userData.find(function(err, users) {
     let usernameList = '';
     for(let i in users) {
         usernameList += users[i].username + ', '
+        users[i].beamLenght = 3;
+        users[i].save();
     }
     console.log('Registered users: ' + usernameList);
 });
@@ -46,14 +48,22 @@ let scoreboards = {};
 let map = new U.Map(30, 100, 100);
 map.addTiles(3, 2);
 map.addTiles(4, 1);
-map.addSign('Welcome to the server', new U.Point(10, 10));
+//SPAWN AREA
+map.setSafeZone(true, new U.Point(0, 0), new U.Point(16, 16));
+map.tile[14][0] = 3; map.tile[0][14] = 3; map.tile[0][0] = 3; map.tile[14][14] = 3;
+map.addSign('Controls:<br>Move: WASD<br>Shoot: SPACE<br>Place blocks: LEFT MOUSE', new U.Point(0, 4));
+map.addSign("You can delete blocks by just walking over them if you aren't in the safe zone. Hovever you can't shoot through blocks.", new U.Point(0, 10));
+map.addSign('You can get Uranium by collecting it from the ground or by killing players.', new U.Point(4, 0));
+map.addSign('With Uranium you can buy upgrades from the top menu. The prices increase with formula x^2.', new U.Point(10, 0));
+map.addSign('You are entering/leaving the safe zone.<br>Good luck!', new U.Point(7, 14));
+map.addSign('You are entering/leaving the safe zone.<br>Good luck!', new U.Point(14, 7));
 
 let chat = new U.Chat(300);
 chat.addMessage("SERVER", "Server started successfully", "red");
 
 //TIMERS
 setInterval(serverTick, 1000 / 80);
-setInterval(databaseUpdater, 60000 * 3); //AUTOSAVES ALL PLAYERS AND UPDATES SCOREBOARDS EVERY 3 MINUTES
+setInterval(databaseUpdater, 60000 * 5); //AUTOSAVES ALL PLAYERS AND UPDATES SCOREBOARDS EVERY 5 MINUTES
 databaseUpdater();
 
 io.on('connection', function(socket) {
@@ -87,7 +97,7 @@ io.on('connection', function(socket) {
                 return;
             }
             if(user && user.password === passwordHash) {
-                players[socket.id] = new U.Player(data.username, user.uranium, user.healthRegen, user.moveSpeed, user.kills);
+                players[socket.id] = new U.Player(data.username, user.uranium, user.healthRegen, user.moveSpeed, user.beamLenght, user.kills);
                 players[socket.id].respawnPlayer(map);
                 socket.emit('LOGGED', {
                     socketID: socket.id,
@@ -120,6 +130,7 @@ io.on('connection', function(socket) {
                     uranium: 0,
                     healthRegen: 1,
                     moveSpeed: 5,
+                    beamLenght: 3,
                     kills: 0
                 });
 
@@ -167,7 +178,7 @@ io.on('connection', function(socket) {
             players[socket.id].beamStart = startingPoint
             players[socket.id].beamEnd = startingPoint;
             let shootingDistance = 0;
-            while(shootingDistance < map.tileSize * 2 && obgInsideMap(players[socket.id].beamEnd, 0)) {
+            while(shootingDistance < (map.tileSize / 5) * players[socket.id].beamLenght && obgInsideMap(players[socket.id].beamEnd, 0)) {
                 //TEST IF HIT BLOCK
                 let thisTile = getTileCoordinates(players[socket.id].beamEnd);
                 if(thisTile) {
@@ -175,15 +186,26 @@ io.on('connection', function(socket) {
                         break;
                     }
                 }
-                //TEST PLAYER HIT
+                //TEST IF PLAYER HIT AND NOT IN SAFE ZONE
                 let playerHitID = getPlayersInRadius(socket.id , players[socket.id].beamEnd, map.tileSize / 2);
                 if(playerHitID) {
-                    players[playerHitID].health -= 5;
-                    if(players[playerHitID].health <= 0) {
-                        players[socket.id].kills += 1;
-                        players[playerHitID].respawnPlayer(map);
+                    let safeTile = getTileCoordinates(getPlayerCenter(playerHitID));  
+                    if(!map.safeZone[safeTile.x][safeTile.y]) {
+                        players[playerHitID].health -= 5;
+                        if(players[playerHitID].health <= 0) {
+                            let deathLoc = getTileCoordinates(players[playerHitID].location);
+                            players[playerHitID].respawnPlayer(map);
+
+                            players[socket.id].kills += 1;
+                            //ADDS URANIUM TO THE GROUND
+                            for(let y = deathLoc.y - 1; y <= deathLoc.y + 1; y++) {
+                                for(let x = deathLoc.x - 1; x <= deathLoc.x + 1; x++) {
+                                    map.pushTileUpdate(new U.Point(x, y), 4);
+                                }
+                            }
+                        }
+                        break;
                     }
-                    break;
                 }
                 //RAYCAST
                 players[socket.id].beamEnd = U.Point.add(players[socket.id].beamEnd, new U.Point(data.shoot.x * 5, data.shoot.y * 5));
@@ -214,31 +236,35 @@ io.on('connection', function(socket) {
             players[socket.id].signShown = false;
             if(map.tile[thisTile.x][thisTile.y] == 4) {
                 players[socket.id].uranium += 1;
-            }
-            map.pushTileUpdate(thisTile, 0);   
+            }   
         }
+        map.pushTileUpdate(thisTile, 0);
         
         //PLACES BLOCKS IF NOT SIGN
-        if(data.tile !== null && insideMap(data.tile) && map.tile[data.tile.x][data.tile.y] != 5) {
+        if(data.tile !== null && insideMap(data.tile)) {
             map.pushTileUpdate(data.tile, 1);
         }
 
         //BUTTON CLICKED
         if(data.clickedButtonID != null) {
-            if(data.clickedButtonID == 0 && players[socket.id].healthRegen > 0) {
-                players[socket.id].tryChangeStats(-1, 0);
-            } else if(data.clickedButtonID == 1 && players[socket.id].uranium > 0) {
-                players[socket.id].tryChangeStats(1, 0);
-            } else if(data.clickedButtonID == 2 && players[socket.id].moveSpeed > 1) {
-                players[socket.id].tryChangeStats(0, -1);
-            } else if(data.clickedButtonID == 3 && players[socket.id].uranium > 0) {
-                players[socket.id].tryChangeStats(0, 1);
+            if(data.clickedButtonID == 0) {
+                players[socket.id].tryChangeStats(-1, 0, 0);
+            } else if(data.clickedButtonID == 1) {
+                players[socket.id].tryChangeStats(1, 0, 0);
+            } else if(data.clickedButtonID == 2) {
+                players[socket.id].tryChangeStats(0, -1, 0);
+            } else if(data.clickedButtonID == 3) {
+                players[socket.id].tryChangeStats(0, 1, 0);
             } else if(data.clickedButtonID == 4) {
+                players[socket.id].tryChangeStats(0, 0, -1);
+            } else if(data.clickedButtonID == 5) {
+                players[socket.id].tryChangeStats(0, 0, 1);
+            } else if(data.clickedButtonID == 6) {
                 socket.emit('SCOREBOARD', {
                     type: 0,
                     scoreboard: scoreboards.uranium
                 });
-            } else if(data.clickedButtonID == 5) {
+            } else if(data.clickedButtonID == 7) {
                 socket.emit('SCOREBOARD', {
                     type: 1,
                     scoreboard: scoreboards.kills
@@ -252,7 +278,7 @@ io.on('connection', function(socket) {
             let userinfos = [];
             userData.find(function(err, users) {
                 for(let i in users) {
-                    userinfos.push([users[i].username, users[i].uranium, users[i].healthRegen, users[i].moveSpeed, users[i].kills]);
+                    userinfos.push([users[i].username, users[i].uranium, users[i].healthRegen, users[i].moveSpeed, users[i].beamLenght, users[i].kills]);
                 }
                 socket.emit('ADMINLOGGED', userinfos); 
             });
@@ -349,6 +375,7 @@ function savePlayerStats(id, deleteStatsFromMemory) {
                 user.uranium = players[id].uranium;
                 user.healthRegen = players[id].healthRegen;
                 user.moveSpeed = players[id].moveSpeed;
+                user.beamLenght = players[id].beamLenght;
                 user.kills = players[id].kills;
                 user.save();
 
