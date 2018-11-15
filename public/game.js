@@ -14,14 +14,19 @@ let ctx;
 let bufferCanvas;
 let bufferCTX;
 
-//TEXTURES/ TILES
+//TEXTURES
 let textures = [];
 textures.push(new U.Texture('/recources/0.png', false, new U.Point(0, 0)));
 textures.push(new U.Texture('/recources/1.png', true, new U.Point(0, -11)));
-textures.push(new U.Texture('/recources/2.png', false, new U.Point(0, 0)));
-textures.push(new U.Texture('/recources/3.png', true, new U.Point(-30, -60)));
-textures.push(new U.Texture('/recources/4.png', true, new U.Point(0, 0)));
-textures.push(new U.Texture('/recources/5.png', true, new U.Point(-10, -40)));
+textures.push(new U.Texture('/recources/2.png', true, new U.Point(-30, -60)));
+textures.push(new U.Texture('/recources/3.png', true, new U.Point(0, 0)));
+textures.push(new U.Texture('/recources/4.png', true, new U.Point(-10, -40)));
+
+let playerTextures = [];
+playerTextures.push(new U.Texture('/recources/characters/0.png', false, new U.Point(0, 0)));
+playerTextures.push(new U.Texture('/recources/characters/1.png', false, new U.Point(0, 0)));
+playerTextures.push(new U.Texture('/recources/characters/2.png', false, new U.Point(0, 0)));
+playerTextures.push(new U.Texture('/recources/characters/3.png', false, new U.Point(0, 0)));
 
 //WORK IN PROGRESS
 let gameWidth = 1200;
@@ -313,7 +318,7 @@ function drawGrapichs() {
         if(players[id].beamStart !== null) {
             bufferCTX = U.Player.drawBeam(bufferCTX, getAbsolutePosition(players[id].beamStart), getAbsolutePosition(players[id].beamEnd));
         }
-        bufferCTX = U.Player.drawPlayer(bufferCTX, textures[2].image, players[id], players[socketID].location);
+        bufferCTX = U.Player.drawPlayer(bufferCTX, playerTextures[players[id].character].image, players[id], players[socketID].location);
     }  
 
     //DRAWS ONTOP TILES

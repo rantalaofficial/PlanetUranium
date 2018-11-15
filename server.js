@@ -36,7 +36,9 @@ userData.find(function(err, users) {
     let usernameList = '';
     for(let i in users) {
         usernameList += users[i].username + ', '
-        users[i].beamLenght = 3;
+
+        //users[i].character = 1;
+
         users[i].save();
     }
     console.log('Registered users: ' + usernameList);
@@ -46,11 +48,11 @@ let players = {};
 let scoreboards = {};
 
 let map = new U.Map(30, 100, 100);
-map.addTiles(3, 2);
-map.addTiles(4, 1);
+map.addTiles(2, 2);
+map.addTiles(3, 1);
 //SPAWN AREA
 map.setSafeZone(true, new U.Point(0, 0), new U.Point(16, 16));
-map.tile[14][0] = 3; map.tile[0][14] = 3; map.tile[0][0] = 3; map.tile[14][14] = 3;
+map.tile[14][0] = 2; map.tile[0][14] = 2; map.tile[0][0] = 2; map.tile[14][14] = 2;
 map.addSign('Controls:<br>Move: WASD<br>Shoot: SPACE<br>Place blocks: LEFT MOUSE', new U.Point(0, 4));
 map.addSign("You can delete blocks by just walking over them if you aren't in the safe zone. Hovever you can't shoot through blocks.", new U.Point(0, 10));
 map.addSign('You can get Uranium by collecting it from the ground or by killing players.', new U.Point(4, 0));
@@ -97,7 +99,7 @@ io.on('connection', function(socket) {
                 return;
             }
             if(user && user.password === passwordHash) {
-                players[socket.id] = new U.Player(data.username, user.uranium, user.healthRegen, user.moveSpeed, user.beamLenght, user.kills);
+                players[socket.id] = new U.Player(user.username, user.character, user.uranium, user.healthRegen, user.moveSpeed, user.beamLenght, user.kills);
                 players[socket.id].respawnPlayer(map);
                 socket.emit('LOGGED', {
                     socketID: socket.id,
@@ -119,6 +121,11 @@ io.on('connection', function(socket) {
             return;
         }
 
+        if(isNaN(data.character) || data.character < 0 || data.character > 3) {
+            socket.emit('REGISTERFAILED', 'You have to select a character.');
+            return;
+        }
+
         userData.findOne({username: data.username}, function(err, user) {
             if(user) {
                 socket.emit('REGISTERFAILED', 'That username is already in use');
@@ -127,6 +134,7 @@ io.on('connection', function(socket) {
                 let newUser = new userData({
                     username: data.username,
                     password: passwordHash,
+                    character: data.character,
                     uranium: 0,
                     healthRegen: 1,
                     moveSpeed: 5,
@@ -200,7 +208,7 @@ io.on('connection', function(socket) {
                             //ADDS URANIUM TO THE GROUND
                             for(let y = deathLoc.y - 1; y <= deathLoc.y + 1; y++) {
                                 for(let x = deathLoc.x - 1; x <= deathLoc.x + 1; x++) {
-                                    map.pushTileUpdate(new U.Point(x, y), 4);
+                                    map.pushTileUpdate(new U.Point(x, y), 3);
                                 }
                             }
                         }
@@ -226,7 +234,7 @@ io.on('connection', function(socket) {
         }
         //REMOVES ANY SOLID BLOCKS FROM PLAYERS LOCATION, IF TILE IS SHARD ADDS SHARD TO PLAYER, IF TILE IS SIGN SENDS ALERT WITH SIGN TEXT
         let thisTile = getTileCoordinates(getPlayerCenter(socket.id));  
-        if(map.tile[thisTile.x][thisTile.y] == 5) {
+        if(map.tile[thisTile.x][thisTile.y] == 4) {
             //SHOWS SIGN TEXT ONLY ONCE
             if(!players[socket.id].signShown) {
                 players[socket.id].signShown = true;
@@ -234,7 +242,7 @@ io.on('connection', function(socket) {
             }
         } else {
             players[socket.id].signShown = false;
-            if(map.tile[thisTile.x][thisTile.y] == 4) {
+            if(map.tile[thisTile.x][thisTile.y] == 3) {
                 players[socket.id].uranium += 1;
             }   
         }
@@ -278,7 +286,7 @@ io.on('connection', function(socket) {
             let userinfos = [];
             userData.find(function(err, users) {
                 for(let i in users) {
-                    userinfos.push([users[i].username, users[i].uranium, users[i].healthRegen, users[i].moveSpeed, users[i].beamLenght, users[i].kills]);
+                    userinfos.push([users[i].username, users[i].character, users[i].uranium, users[i].healthRegen, users[i].moveSpeed, users[i].beamLenght, users[i].kills]);
                 }
                 socket.emit('ADMINLOGGED', userinfos); 
             });

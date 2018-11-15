@@ -7,7 +7,7 @@ var showRegister = false;
 $('#submitButton').click(function() {
     resetTexts();
     if(showRegister) {
-        register($('#usernameInput').val(), $('#passwordInput').val(), $('#passwordConfirmInput').val());
+        register($('#usernameInput').val(), $('#passwordInput').val(), $('#passwordConfirmInput').val(), $('input[name=chrSelectRadioBtn]:checked').val());
     } else {
         login($('#usernameInput').val(), $('#passwordInput').val());
     }
@@ -18,6 +18,7 @@ $('#switchFormButton').click(function() {
     $('#passwordConfirmText').toggle();
     $('#passwordConfirmInput').toggle();
     $('#passwordWarningText').toggle();
+    $('#chrSelect').toggle();
 
     if(showRegister) {
         showRegister = false;
@@ -48,12 +49,18 @@ function login(username, password) {
     }
 }
 
-function register(username, password, confirmPassword) {
+function register(username, password, confirmPassword, character) {
+    if(character === undefined || character < 0 || character > 3) {
+        $('#failedText').text("You have to select a character.");
+        return;
+    }
+
     if(username && password) {
         if(password === confirmPassword) {
             socket.emit('REGISTER', {
                 username: username,
-                password: password
+                password: password,
+                character: character
             });
         } else {
             $('#failedText').text("The passwords don't match.");

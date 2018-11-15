@@ -9,8 +9,9 @@ class Point {
     }
 }
 class Player {
-    constructor(username, uranium, healthRegen, moveSpeed, beamLenght, kills) {
+    constructor(username, character, uranium, healthRegen, moveSpeed, beamLenght, kills) {
         this.username = username;
+        this.character = character;
         this.uranium = uranium;
         this.healthRegen = healthRegen;
         this.health = 100;
@@ -99,7 +100,7 @@ class Map {
     }
 
     addSign(text, loc) {
-        this.tile[loc.x][loc.y] = 5;
+        this.tile[loc.x][loc.y] = 4;
         this.signText[loc.x][loc.y] = text;
     }
 

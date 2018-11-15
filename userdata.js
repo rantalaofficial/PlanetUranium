@@ -10,6 +10,10 @@ let userDataSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    character: {
+        type: Number,
+        required: true
+    },
     uranium: {
         type: Number,
         required: true
