@@ -3,9 +3,12 @@ import * as U from '/Uranium2DEngine.js';
 let username;
 let password;
 
+//KEEPS TRACK OF GAME PERFORMANCE
 let targetFPS = 60;
 let fps = 0;
 let fpsCounter = 0;
+let serverTicks = 0;
+let serverTicksCounter = 0;
 
 //RENDERS ONLY STUFF THAT IS INSIDE GAME
 let extraDrawDistance = 100; //PIXELS
@@ -261,6 +264,7 @@ socket.on('SERVERPACKET', function(data) {
     if(!socketID) {
         return;
     }
+    serverTicksCounter += 1;
 
     if(data.updatedTiles) {
         for(var i = 0; i < data.updatedTiles.length; i++) {
@@ -331,13 +335,15 @@ function drawGrapichs() {
         }
     }
     
-    //MOUSE POINTER
+    //MOUSE POINTER AND INFO 
     bufferCTX.fillStyle = 'white';
+    bufferCTX.font = "12px Arial";
     bufferCTX.fillRect(mousePos.x, mousePos.y, 5, 5);
+    bufferCTX.fillText('FPS: ' + fps + ' | SERVER TICKS: ' + serverTicks, 5, 70);
 
     game.drawMiniMap(new U.Point(200, 200), players, signs);
     bufferCTX = game.ctx;
-
+    
     ctx.drawImage(bufferCanvas, 0, 0);
 }
 
@@ -411,4 +417,6 @@ function zeroFill(number) {
 function secTimer() {
     fps = fpsCounter
     fpsCounter = 0;
+    serverTicks = serverTicksCounter;
+    serverTicksCounter = 0;
 }

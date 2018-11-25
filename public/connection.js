@@ -1,5 +1,3 @@
 //CHANGE THE ADDRESS
-var socket = io.connect('localhost:8080');
-
-
+var socket = io.connect(window.location.hostname + ':8080');
 

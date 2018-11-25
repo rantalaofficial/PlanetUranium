@@ -64,7 +64,7 @@ let chat = new U.Chat(300);
 chat.addMessage("SERVER", "Server started successfully", "red");
 
 //TIMERS
-setInterval(serverTick, 1000 / 80);
+setInterval(serverTick, 1000 / 70);
 setInterval(databaseUpdater, 60000 * 5); //AUTOSAVES ALL PLAYERS AND UPDATES SCOREBOARDS EVERY 5 MINUTES
 databaseUpdater();
 
