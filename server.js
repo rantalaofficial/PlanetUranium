@@ -46,27 +46,17 @@ userData.find(function(err, users) {
 
 let players = {};
 let scoreboards = {};
-
-let map = new U.Map(30, 100, 100);
-map.addTiles(2, 2);
-map.addTiles(3, 1);
-//SPAWN AREA
-map.setSafeZone(true, new U.Point(0, 0), new U.Point(16, 16));
-map.tile[14][0] = 2; map.tile[0][14] = 2; map.tile[0][0] = 2; map.tile[14][14] = 2;
-map.addSign('Controls:<br>Move: WASD<br>Shoot: SPACE<br>Place blocks: LEFT MOUSE', new U.Point(0, 4));
-map.addSign("You can delete blocks by just walking over them if you aren't in the safe zone. Hovever you can't shoot through blocks.", new U.Point(0, 10));
-map.addSign('You can get Uranium by collecting it from the ground or by killing players.', new U.Point(4, 0));
-map.addSign('With Uranium you can buy upgrades from the top menu. The prices increase with formula x^2.', new U.Point(10, 0));
-map.addSign('You are entering/leaving the safe zone.<br>Good luck!', new U.Point(7, 14));
-map.addSign('You are entering/leaving the safe zone.<br>Good luck!', new U.Point(14, 7));
+let map = {};
 
 let chat = new U.Chat(300);
 chat.addMessage("SERVER", "Server started successfully", "red");
 
 //TIMERS
-setInterval(serverTick, 1000 / 70);
-setInterval(databaseUpdater, 60000 * 5); //AUTOSAVES ALL PLAYERS AND UPDATES SCOREBOARDS EVERY 5 MINUTES
+mapReset();
 databaseUpdater();
+setInterval(databaseUpdater, 60000 * 5); //AUTOSAVES ALL PLAYERS AND UPDATES SCOREBOARDS EVERY 5 MINUTES
+setInterval(mapReset, 60000 * 15); //RESETS MAP EVERY 15 MINUTES
+setInterval(serverTick, 1000 / 70);
 
 io.on('connection', function(socket) {
 
@@ -359,6 +349,24 @@ function databaseUpdater() {
             }
         });
     }, 10000);
+}
+
+function mapReset() {
+    map = new U.Map(30, 100, 100);
+    map.addTiles(2, 2);
+    map.addTiles(3, 1);
+    //SPAWN AREA
+    map.setSafeZone(true, new U.Point(0, 0), new U.Point(16, 16));
+    map.tile[14][0] = 2; map.tile[0][14] = 2; map.tile[0][0] = 2; map.tile[14][14] = 2;
+    map.addSign('Controls:<br>Move: WASD<br>Shoot: SPACE<br>Place blocks: LEFT MOUSE', new U.Point(0, 4));
+    map.addSign("You can delete blocks by just walking over them if you aren't in the safe zone. Hovever you can't shoot through blocks.", new U.Point(0, 10));
+    map.addSign('You can get Uranium by collecting it from the ground or by killing players.', new U.Point(4, 0));
+    map.addSign('With Uranium you can buy upgrades from the top menu. The prices increase with formula x^2.', new U.Point(10, 0));
+    map.addSign('You are entering/leaving the safe zone.<br>Good luck!', new U.Point(7, 14));
+    map.addSign('You are entering/leaving the safe zone.<br>Good luck!', new U.Point(14, 7));
+
+    io.sockets.emit('RESETMAP', map);
+    chat.addMessage("SERVER", "Map reset complete", "red");
 }
 
 function getTopUsers(sort, limit) {

@@ -282,6 +282,10 @@ socket.on('SERVERPACKET', function(data) {
     $('#beamLenghtLabel').text('Beam lenght: ' + zeroFill(players[socketID].beamLenght));
 });
 
+socket.on('RESETMAP', function(data) {
+    map = data;
+});
+
 function drawGrapichs() {
     fpsCounter += 1;
     //SPACE AND STARS
