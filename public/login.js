@@ -5,13 +5,23 @@ $(document).ready(function() {
 var showRegister = false;
 
 $('#submitButton').click(function() {
+    submit();
+});
+
+$(document).on('keydown', function(e) {
+    if(e.keyCode === 13) {
+        submit();
+    };
+});
+
+function submit() {
     resetTexts();
     if(showRegister) {
         register($('#usernameInput').val(), $('#passwordInput').val(), $('#passwordConfirmInput').val(), $('input[name=chrSelectRadioBtn]:checked').val());
     } else {
         login($('#usernameInput').val(), $('#passwordInput').val());
     }
-});
+}
 
 $('#switchFormButton').click(function() {
     resetTexts();

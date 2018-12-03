@@ -95,13 +95,13 @@ class Player {
         if(insideGameWindow(location)) {
             //HEALTH BAR
             ctx.fillStyle = 'black';
-            ctx.fillRect(location.x, location.y - 10, 50, 10);
+            ctx.fillRect(location.x - 16, location.y - 14, 64, 14);
             ctx.fillStyle = 'red';
-            ctx.fillRect(location.x, location.y - 10, player.health / 2, 10);
+            ctx.fillRect(location.x - 16, location.y - 14, player.health / 1.5, 16);
 
             ctx.fillStyle = 'white';
             ctx.font = "15px Arial";
-            ctx.fillText(player.username, location.x, location.y);
+            ctx.fillText(player.username, location.x + 16 - ctx.measureText(player.username).width / 2, location.y - 1);
             ctx.drawImage(texture, location.x, location.y);
         }
         return ctx;

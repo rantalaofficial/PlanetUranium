@@ -211,6 +211,8 @@ io.on('connection', function(socket) {
                                     map.pushTileUpdate(new U.Point(x, y), 3);
                                 }
                             }
+
+                            chat.addMessage("INFO", players[playerHitID].username + " was killed by " + players[socket.id].username, "yellow");
                         }
                         break;
                     }
