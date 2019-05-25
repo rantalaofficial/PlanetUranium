@@ -24,8 +24,6 @@ app.use(express.static('public'));
 let io = socket(server);
 
 //DATABASE
-heroku config:set MONGOLAB_URI = "mongodb+srv://PlanetUraniumUser:UraniumPlanetPass@planeturanium-qscto.mongodb.net/test?retryWrites=true"
-
 mongoose.connect('process.env.MONGOLAB_URI', {useNewUrlParser: true, useCreateIndex: true}, function (err) {
    if (err) throw err;
    console.log('Connected to database');
