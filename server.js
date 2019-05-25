@@ -13,7 +13,12 @@ let server = app.listen(serverPort, function() {
 app.use(function(req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    next();
+	
+	if ('OPTIONS' == req.method) {
+        res.send(200);
+    } else {
+        next();
+	}
 });
 app.use(express.static('public'));
 let io = socket(server);
