@@ -24,7 +24,9 @@ app.use(express.static('public'));
 let io = socket(server);
 
 //DATABASE
-mongoose.connect('mongodb+srv://PlanetUraniumUser:UraniumPlanetPass@planeturanium-qscto.mongodb.net/test?retryWrites=true', {useNewUrlParser: true, useCreateIndex: true}, function (err) {
+heroku config:set MONGOLAB_URI = "mongodb+srv://PlanetUraniumUser:UraniumPlanetPass@planeturanium-qscto.mongodb.net/test?retryWrites=true"
+
+mongoose.connect('process.env.MONGOLAB_URI', {useNewUrlParser: true, useCreateIndex: true}, function (err) {
    if (err) throw err;
    console.log('Connected to database');
 });
