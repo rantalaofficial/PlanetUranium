@@ -5,7 +5,7 @@ const U = require('./Uranium2DServerEngine');
 const mongoose = require('mongoose');
 
 //APP SETUP
-let serverPort = process.env.POR || 8080;
+let serverPort = process.env.PORT || 8080;
 let app = express();
 let server = app.listen(serverPort, function() {
 	console.log("Server started on port " + serverPort)
