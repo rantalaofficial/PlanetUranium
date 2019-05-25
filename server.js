@@ -5,7 +5,7 @@ const U = require('./Uranium2DServerEngine');
 const mongoose = require('mongoose');
 
 //APP SETUP
-let serverPort = 8080;
+let serverPort = process.env.POR || 8080;
 let app = express();
 let server = app.listen(serverPort, function() {
 	console.log("Server started on port " + serverPort)
@@ -19,7 +19,7 @@ app.use(express.static('public'));
 let io = socket(server);
 
 //DATABASE
-mongoose.connect('mongodb://localhost/planeturanium', {useNewUrlParser: true, useCreateIndex: true}, function (err) {
+mongoose.connect('mongodb+srv://PlanetUraniumUser:UraniumPlanetPass@planeturanium-qscto.mongodb.net/test?retryWrites=true', {useNewUrlParser: true, useCreateIndex: true}, function (err) {
    if (err) throw err;
    console.log('Connected to database');
 });
